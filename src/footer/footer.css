@@ -1,0 +1,223 @@
+
+.footer {
+    width: 100%;
+    background: rgba(255, 255, 255, 1);
+    border-top-left-radius: 30px;
+    border-top-right-radius: 30px;
+    padding: 20px 0;
+    margin-top: auto; /* Ключевое изменение */
+    box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.05);
+    position: relative;
+}
+.footer .footer_all {
+    width: 100%;
+    max-width: 1110px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    color: black;
+    margin: 0 auto;
+    padding: 0 15px;
+    gap: 20px;
+}
+
+.footer .logo {
+    flex-shrink: 0;
+}
+
+.footer .logo img {
+    width: 120px;
+    height: auto;
+    transition: transform 0.3s ease;
+}
+
+.footer .logo img:hover {
+    transform: scale(1.05);
+}
+
+.footer .links {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+}
+
+.footer .links a {
+    color: black;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: color 0.3s ease, transform 0.2s ease;
+    padding: 5px 0;
+}
+
+.footer .links a:hover {
+    color: rgba(255, 165, 66, 1);
+    transform: translateX(5px);
+}
+
+.footer .terms-language {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    align-items: center;
+}
+
+.footer .terms-language .terms {
+    font-weight: 400;
+    font-size: 15px;
+    line-height: 100%;
+    color: #333;
+    transition: color 0.3s ease;
+}
+
+.footer .terms-language .terms:hover {
+    color: rgba(255, 165, 66, 1);
+}
+
+.footer .language-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+}
+
+.footer .language-buttons button {
+    background-color: #f5f5f5;
+    color: black;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 100%;
+}
+
+.footer .language-buttons button.active {
+    color: white;
+    background-color: rgba(255, 165, 66, 1);
+}
+
+.footer .language-buttons button:hover {
+    background-color: #e0e0e0;
+}
+
+.footer .social-icons {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.footer .social-icon {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    opacity: 0.8;
+}
+
+.footer .social-icon:hover {
+    transform: scale(1.15);
+    opacity: 1;
+}
+
+/* Адаптивность */
+@media (max-width: 992px) {
+    .footer .footer_all {
+        justify-content: center;
+        gap: 30px;
+        padding: 20px;
+    }
+    
+    .footer .links {
+        align-items: center;
+    }
+}
+
+@media (max-width: 768px) {
+    .footer {
+        padding: 30px 0;
+        margin-top: 30px;
+    }
+    
+    .footer .footer_all {
+        flex-direction: column;
+        height: auto;
+        gap: 25px;
+        text-align: center;
+    }
+    
+    .footer .logo {
+        margin-bottom: 10px;
+    }
+    
+    .footer .links,
+    .footer .terms-language {
+        gap: 12px;
+    }
+    
+    .footer .terms-language .terms {
+        margin-bottom: 5px;
+    }
+    
+    .footer .social-icons {
+        margin-top: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .footer {
+        border-top-left-radius: 20px;
+        border-top-right-radius: 20px;
+        padding: 25px 0;
+    }
+    
+    .footer .footer_all {
+        gap: 20px;
+    }
+    
+    .footer .links a,
+    .footer .terms-language .terms {
+        font-size: 13px;
+    }
+    
+    .footer .language-buttons button {
+        padding: 5px 10px;
+        font-size: 13px;
+    }
+    
+    .footer .social-icons {
+        gap: 12px;
+    }
+    
+    .footer .social-icon {
+        width: 24px;
+        height: 24px;
+    }
+}
+
+.footer-favorites-link {
+    position: relative;
+    display: inline-block;
+    padding-right: 20px;
+}
+
+.footer-favorites-badge {
+    position: absolute;
+    top: -8px;
+    right: 0;
+    background-color: #ff6b00;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+}

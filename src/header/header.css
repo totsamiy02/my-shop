@@ -1,0 +1,118 @@
+.header {
+    background: #fff;
+    /* padding: 20px 0; */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    position: relative;
+    z-index: 100;
+}
+
+.header_main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px; /* Добавляем отступ между элементами */
+}
+
+.header_left {
+    display: flex;
+    align-items: center;
+    gap: 64px;
+    flex-wrap: wrap; /* Для адаптива */
+}
+
+.logo {
+    display: block;
+    flex-shrink: 0;
+}
+
+.logo img {
+    height: 40px;
+    width: auto;
+    min-width: 80px;
+    object-fit: contain;
+    display: block;
+}
+
+.header_right {
+    display: flex;
+    align-items: center;
+    gap: 35px; /* Заменяем margin-right на gap */
+}
+
+.icon {
+    height: 24px;
+    width: 24px; /* Фиксируем ширину для одинаковых иконок */
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    object-fit: contain;
+}
+
+.icon:hover {
+    transform: scale(1.15); /* Увеличиваем эффект ховера */
+}
+
+/* Адаптив */
+@media (max-width: 768px) {
+    .header {
+        padding: 15px 0;
+    }
+    
+    .header_main {
+        flex-direction: row; /* Оставляем в строку на мобильных */
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 15px;
+    }
+    
+    .header_left {
+        gap: 30px;
+        justify-content: center;
+        width: 100%;
+    }
+    
+    .logo img {
+        height: 36px;
+    }
+    
+    .header_right {
+        gap: 25px;
+    }
+}
+
+@media (max-width: 480px) {
+    .header_left {
+        gap: 20px;
+    }
+    
+    .header_right {
+        gap: 20px;
+    }
+    
+    .icon {
+        height: 22px;
+        width: 22px;
+    }
+}
+
+.favorites-link {
+    position: relative;
+    display: inline-block;
+    margin-right: 20px;
+}
+
+.favorites-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background-color: #ff6b00;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}

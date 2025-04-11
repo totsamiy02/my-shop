@@ -1,0 +1,134 @@
+/* Основной контейнер страницы */
+.contacts-container {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    padding: 20px;
+    margin: 0 auto;
+    gap: 20px;
+}
+
+.map-phone-container {
+    flex: 1;
+    min-width: 300px;
+    background-color: #f9f9f9;
+    border-radius: 30px;
+    padding: 20px;
+}
+.map-wrapper {
+    width: 100%;
+    position: relative;
+    border-radius: 30px;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+  /* Создаем соотношение сторон 16:9 */
+.map-wrapper::before {
+    content: '';
+    display: block;
+    padding-top: 56.25%; /* 16:9 Aspect Ratio */
+}
+
+.map-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+  /* Стили для текста "Наш офис" */
+.office-title {
+    margin-bottom: 35px;
+
+    font-family: Montserrat;
+    font-weight: 600;
+    font-size: 25px;
+    line-height: 100%;
+    letter-spacing: 0%;
+}
+
+/* Стили для адреса */
+.office-address {
+    color: #555;
+    margin-bottom: 20px;
+
+    font-family: Montserrat;
+    font-weight: 500;
+    font-size: 15px;
+    line-height: 100%;
+    letter-spacing: 0%;
+    
+
+}
+
+  /* Стили для блока телефона */
+.phone-block {
+    display: flex;
+    align-items: center;
+    margin-top: 20px;
+
+    font-family: Montserrat;
+    font-weight: 600;
+    font-size: 25px;
+    line-height: 100%;
+    letter-spacing: 0%;
+    
+}
+
+.phone-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 10px;
+}
+
+.social-icons-block {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+
+.social-link {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 60px;
+    height: 60px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 30px;
+    transition: background-color 0.3s;
+}
+
+.social-link:hover {
+    background-color: rgba(255, 255, 255, 1);
+}
+
+.social-icon {
+    width: 30px;
+    height: 30px;
+}
+
+ /* Адаптация для мобильных устройств */
+@media (max-width: 768px) {
+    .contacts-container {
+        flex-direction: column;
+    }
+    
+    .map-phone-container {
+        width: 100%;
+    }
+    
+    .social-icons-block {
+        flex-direction: row;
+        justify-content: center;
+        margin-top: 20px;
+    }
+}
+
+    @media (max-width: 480px) {
+    .map-wrapper::before {
+      padding-top: 75%; /* Более высокое соотношение на маленьких экранах */
+    }
+}
