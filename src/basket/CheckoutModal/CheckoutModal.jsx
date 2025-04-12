@@ -53,6 +53,8 @@ const CheckoutModal = ({ formData, handleInputChange, handleCheckoutSubmit, isCh
         });
     };
 
+
+    
     return (
         isCheckoutOpen && (
             <div className="modal-overlay">

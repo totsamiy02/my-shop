@@ -1,6 +1,7 @@
 import './SearchBar.css';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+// import Filters from '../SearchBar/Filters/Filters';
 
 function SearchBar() {
     const [query, setQuery] = useState('');

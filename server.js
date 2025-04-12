@@ -7,7 +7,12 @@ const path = require('path');
 const app = express();
 const port = 3001;
 
-app.use(cors()); // разрешаем CORS
+// app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:3000',  // Разрешаем доступ с фронтенда
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],  // Разрешаем нужные методы
+    allowedHeaders: ['Content-Type'],  // Разрешаем нужные заголовки
+}));
 const db = new sqlite3.Database('./store.db');
 
 // Маршрут получения всех товаров
@@ -25,3 +30,5 @@ app.get('/api/products', (req, res) => {
 app.listen(port, () => {
     console.log(`Сервер запущен на http://localhost:${port}`);
 });
+
+

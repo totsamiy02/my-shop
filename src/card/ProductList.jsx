@@ -3,6 +3,7 @@ import ProductCard from './ProductCard';
 import { useEffect, useState } from 'react';
 import Notification from '../Notification/Notification';
 import ProductModal from '../card/modal/ProductModal';
+import usePagination from '../hook/usePagination';
 
 function ProductList() {
     const [products, setProducts] = useState([]);
@@ -12,6 +13,15 @@ function ProductList() {
         const savedBasket = localStorage.getItem('basket');
         return savedBasket ? JSON.parse(savedBasket) : [];
     });
+
+    const {
+        currentPage,
+        totalPages,
+        getCurrentData,
+        nextPage,
+        prevPage,
+        goToPage,
+    } = usePagination(products, 21);
 
     useEffect(() => {
         fetch('http://localhost:3001/api/products')
@@ -62,10 +72,10 @@ function ProductList() {
             <div className="container_all">
                 <h2 className="category-heading">Спортивное питание</h2>
                 <div className="product-grid">
-                    {products.map((product) => (
+                    {getCurrentData().map((product) => (
                         <ProductCard
                             key={product.id}
-                            id={product.id} // Убедитесь в уникальности
+                            id={product.id}
                             image={product.image}
                             title={product.name}
                             price={product.price}
@@ -74,6 +84,24 @@ function ProductList() {
                             onCardClick={() => handleProductClick(product)}
                         />
                     ))}
+                </div>
+                {/* Блок пагинации */}
+                <div className="pagination">
+                    <button 
+                        onClick={prevPage} 
+                        disabled={currentPage === 1}
+                    >
+                        Назад
+                    </button>
+                    
+                    <span>Страница {currentPage} из {totalPages}</span>
+                    
+                    <button 
+                        onClick={nextPage} 
+                        disabled={currentPage === totalPages}
+                    >
+                        Вперед
+                    </button>
                 </div>
                 {showNotification && (
                     <Notification message="Товар добавлен в корзину!" show={showNotification} />
