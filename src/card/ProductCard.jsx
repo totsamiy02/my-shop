@@ -81,7 +81,13 @@ function ProductCard({ image, title, price, quantity, handleAddToBasket, onCardC
                 className="add-to-basket-button" 
                 onClick={(e) => {
                     e.stopPropagation();
-                    handleAddToBasket({ image, title, price, id });
+                    handleAddToBasket({ 
+                        image, 
+                        title, 
+                        price, 
+                        id,
+                        availableQuantity: quantity // Добавляем текущее количество
+                    });
                 }}
                 disabled={quantity === 0}
             >

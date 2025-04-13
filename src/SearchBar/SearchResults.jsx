@@ -23,29 +23,6 @@ function SearchResults() {
     const [selectedProduct, setSelectedProduct] = useState(null); // Добавляем состояние для выбранного товара
 
     const query = new URLSearchParams(location.search).get('query')?.toLowerCase() || '';
-
-    // // Добавить состояние для фильтров
-    // const [filters, setFilters] = useState({
-    //     category: null,
-    //     minPrice: 0,
-    //     maxPrice: 20000
-    // });
-
-    // // Добавить функцию фильтрации
-    // const applyFilters = (products) => {
-    //     return products.filter(product => {
-    //         const matchesCategory = !filters.category || product.category_id === filters.category;
-    //         const matchesPrice = product.price >= filters.minPrice && product.price <= filters.maxPrice;
-    //         return matchesCategory && matchesPrice;
-    //     });
-    // };
-
-    // useEffect(() => {
-    //     // Загружаем категории
-    //     fetch('http://localhost:3001/api/categories')
-    //         .then(res => res.json())
-    //         .then(data => setCategories(data));
-    // }, []);
     
     const [categories, setCategories] = useState([]);
     useEffect(() => {
@@ -57,7 +34,7 @@ function SearchResults() {
                 setIsLoading(false);
             });
     }, []);
-
+    
     useEffect(() => {
         const results = products.filter(product =>
             product.name.toLowerCase().includes(query)

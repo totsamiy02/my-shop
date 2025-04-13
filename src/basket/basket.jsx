@@ -1,18 +1,16 @@
-// Basket.jsx
+import React, { useState, useEffect } from 'react';
 import '../index.css';
 import './basket.css';
-import { useState, useEffect } from 'react';
-import Header from '../header/header.jsx'; 
-import Footer from '../footer/footer.jsx'; 
+import Header from '../header/header';
+import Footer from '../footer/footer';
 import { useNavigate } from 'react-router-dom';
 import cartImage from '../img/Иллюстрация.svg';
-import CheckoutModal from './CheckoutModal/CheckoutModal.jsx'; 
+import CheckoutModal from './CheckoutModal/CheckoutModal';
 
 function Basket() {
     const navigate = useNavigate();
     const [basket, setBasket] = useState([]);
-    const [products, setProducts] = useState([]); // Состояние для продуктов
-
+    const [products, setProducts] = useState([]);
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [formData, setFormData] = useState({
         firstName: '',
@@ -28,6 +26,29 @@ function Basket() {
     });
     const [formSuccess, setFormSuccess] = useState(false);
 
+    // Загрузка корзины и продуктов
+    useEffect(() => {
+        const savedBasket = JSON.parse(localStorage.getItem('basket')) || [];
+        setBasket(savedBasket);
+
+        fetch('http://localhost:3001/api/products')
+            .then(res => res.json())
+            .then(data => {
+                setProducts(data);
+                // Обновляем maxQuantity в корзине
+                const updatedBasket = savedBasket.map(item => {
+                    const product = data.find(p => p.name === item.title);
+                    return {
+                        ...item,
+                        maxQuantity: product ? product.quantity : 0
+                    };
+                });
+                setBasket(updatedBasket);
+                localStorage.setItem('basket', JSON.stringify(updatedBasket));
+            })
+            .catch(error => console.error('Ошибка:', error));
+    }, []);
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: value });
@@ -36,12 +57,8 @@ function Basket() {
     const handleCheckoutSubmit = (e) => {
         e.preventDefault();
         setFormSuccess(true);
-        
-        // Очищаем корзину
         setBasket([]);
         localStorage.setItem('basket', JSON.stringify([]));
-        
-        // Очищаем форму (опционально)
         setFormData({
             firstName: '',
             lastName: '',
@@ -54,29 +71,11 @@ function Basket() {
             cardExpiry: '',
             cardCVC: '',
         });
-        
         setTimeout(() => {
             setFormSuccess(false);
             setIsCheckoutOpen(false);
         }, 2500);
     };
-
-    // Функция для получения доступного количества товара на складе
-    const getAvailableQuantity = (productName) => {
-        const product = products.find(item => item.name === productName);
-        return product ? product.quantity : 0;
-    };
-
-    // Загружаем корзину и список продуктов при монтировании
-    useEffect(() => {
-        const savedBasket = JSON.parse(localStorage.getItem('basket')) || [];
-        setBasket(savedBasket);
-
-        fetch('http://localhost:3001/api/products')
-            .then((res) => res.json())
-            .then((data) => setProducts(data))
-            .catch((error) => console.error('Ошибка при загрузке товаров:', error));
-    }, []);
 
     const handleGoToCatalog = () => {
         navigate('/');
@@ -88,35 +87,35 @@ function Basket() {
         localStorage.setItem('basket', JSON.stringify(updatedBasket));
     };
 
-    const increaseQuantity = (productId) => {
-        const productInBasket = basket.find(item => item.id === productId);
-        const productInDb = products.find(p => p.name === productInBasket.title);
-
-        if (!productInDb || productInBasket.quantity >= productInDb.quantity) {
-            alert(`Максимальное количество: ${productInDb.quantity} шт.`);
-            return;
-        }
-
-        const updatedBasket = basket.map(item => 
-            item.id === productId 
-                ? { ...item, quantity: item.quantity + 1 } 
-                : item
-        );
+    const updateQuantity = (productId, newQuantity) => {
+        const updatedBasket = basket.map(item => {
+            if (item.id === productId) {
+                // Ограничиваем количество от 1 до maxQuantity
+                const quantity = Math.max(1, Math.min(newQuantity, item.maxQuantity));
+                return { ...item, quantity };
+            }
+            return item;
+        });
         setBasket(updatedBasket);
         localStorage.setItem('basket', JSON.stringify(updatedBasket));
     };
 
-    const decreaseQuantity = (productId) => {
-        const updatedBasket = basket.map(item => 
-            item.id === productId && item.quantity > 1
-                ? { ...item, quantity: item.quantity - 1 }
-                : item
-        );
-        setBasket(updatedBasket);
-        localStorage.setItem('basket', JSON.stringify(updatedBasket));
+    const handleQuantityChange = (productId, e) => {
+        const value = parseInt(e.target.value) || 1;
+        updateQuantity(productId, value);
     };
 
-    // Рассчитываем сумму без копеек
+    const incrementQuantity = (productId) => {
+        const item = basket.find(i => i.id === productId);
+        if (item) updateQuantity(productId, item.quantity + 1);
+    };
+
+    const decrementQuantity = (productId) => {
+        const item = basket.find(i => i.id === productId);
+        if (item) updateQuantity(productId, item.quantity - 1);
+    };
+
+    // Рассчитываем общую сумму
     const totalAmount = Math.floor(
         basket.reduce((sum, item) => {
             const itemTotal = Number(item.price) * Number(item.quantity);
@@ -158,27 +157,34 @@ function Basket() {
                                         <h3 className="cart-item-name">{item.title}</h3>
                                         <span className="cart-item-price">{Math.floor(item.price)}₽</span>
                                         <span className="cart-item-stock">
-                                            Доступно: {getAvailableQuantity(item.title)} шт. | В корзине: {item.quantity} шт.
+                                            Доступно: {item.maxQuantity} шт. | В корзине: {item.quantity} шт.
                                         </span>
                                         <div className="cart-item-quantity">
                                             <button 
-                                                onClick={() => increaseQuantity(item.id)} 
-                                                className="quantity-button"
-                                                disabled={item.quantity >= getAvailableQuantity(item.title)}
-                                            >
-                                                +
-                                            </button>
-                                            <span>{item.quantity}</span>
-                                            <button 
-                                                onClick={() => decreaseQuantity(item.id)} 
+                                                onClick={() => decrementQuantity(item.id)}
                                                 className="quantity-button"
                                                 disabled={item.quantity <= 1}
                                             >
                                                 -
                                             </button>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max={item.maxQuantity}
+                                                value={item.quantity}
+                                                onChange={(e) => handleQuantityChange(item.id, e)}
+                                                className="quantity-input"
+                                            />
+                                            <button 
+                                                onClick={() => incrementQuantity(item.id)}
+                                                className="quantity-button"
+                                                disabled={item.quantity >= item.maxQuantity}
+                                            >
+                                                +
+                                            </button>
                                         </div>
                                         <button 
-                                            onClick={() => removeProduct(item.id)} 
+                                            onClick={() => removeProduct(item.id)}
                                             className="remove-button"
                                         >
                                             Удалить
