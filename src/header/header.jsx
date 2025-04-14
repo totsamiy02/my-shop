@@ -5,7 +5,6 @@ import logo from '../img/logo.svg';
 import heartIcon from '../img/сердце.svg';
 import stor from '../img/корзина.svg';
 import { Link } from 'react-router-dom';
-import SearchBar from '../SearchBar/SearchBar.jsx';
 import { useFavorites } from '../hook/useFavorites';
 
 function Header() {
@@ -18,7 +17,6 @@ function Header() {
                     <Link to="/" className="logo">
                         <img src={logo} alt="logo" />
                     </Link>
-                    <SearchBar />
                 </div>
                 <div className="header_right">
                     <Link to="/favorites" className="favorites-link">

@@ -14,7 +14,6 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import TermsOfService from './terms_of_Service/terms_of_Service.jsx';
 import Contacts from './contact/contact.jsx';
 import Basket from './basket/basket.jsx';
-import SearchResults from './SearchBar/SearchResults.jsx';
 import FavoritesPage from './FavoritesPage/FavoritesPage.jsx';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -33,7 +32,6 @@ root.render(
         <Route path="/terms-of-service" element={<TermsOfService />} />
         <Route path="/contacts" element={<Contacts />} />
         <Route path="/basket" element={<Basket />} />
-        <Route path="/search" element={<SearchResults />} />
         <Route path="/favorites" element={<FavoritesPage />} />
       </Routes>
     </BrowserRouter>

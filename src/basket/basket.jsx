@@ -31,7 +31,7 @@ function Basket() {
         const savedBasket = JSON.parse(localStorage.getItem('basket')) || [];
         setBasket(savedBasket);
 
-        fetch('http://localhost:3001/api/products')
+        fetch('/api/products')
             .then(res => res.json())
             .then(data => {
                 setProducts(data);

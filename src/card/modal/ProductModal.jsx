@@ -3,7 +3,7 @@ import './ProductModal.css';
 import heartOutline from '../../img/сердце.svg';
 import heartFilled from '../../img/сердце черное.svg';
 
-function ProductModal({ product, onClose, handleAddToBasket }) {
+function ProductModal({ product, onClose, onAddToCart }) {
     const [isZoomed, setIsZoomed] = useState(false);
     const [isClosing, setIsClosing] = useState(false);
     const [isZoomClosing, setIsZoomClosing] = useState(false);
@@ -106,7 +106,7 @@ function ProductModal({ product, onClose, handleAddToBasket }) {
                                 className="add-to-basket-button"
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    handleAddToBasket({
+                                    onAddToCart({  // Используем новое имя пропса
                                         image: product.image,
                                         title: product.name,
                                         price: product.price
