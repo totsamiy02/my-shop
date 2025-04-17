@@ -8,13 +8,20 @@ const rateLimit = require('express-rate-limit');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const path = require('path');
+const multer = require('multer');
+const fs = require('fs');
 
 const app = express();
 const port = process.env.PORT || 3001;
 
+const ADMIN_EMAILS = [
+  'arikbilenko@gmail.com'
+  // Добавьте другие email администраторов
+];
+
 // Настройки CORS
 const corsOptions = {
-    origin: ['http://localhost:3000', 'http://localhost:3001'], // Разрешаем оба origin
+    origin: ['http://localhost:3000', 'http://localhost:3001'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
@@ -23,6 +30,22 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// Настройка Multer для загрузки файлов
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadPath = path.join(__dirname, 'uploads');
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+const upload = multer({ storage });
+
 // Инициализация базы данных
 const db = new sqlite3.Database('./store.db', (err) => {
   if (err) {
@@ -30,10 +53,25 @@ const db = new sqlite3.Database('./store.db', (err) => {
   } else {
     console.log('Connected to SQLite database');
     
-    // Проверка существования таблиц (опционально)
-    db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='users'", (err, row) => {
-      if (err || !row) {
-        console.error('Users table does not exist or error checking:', err);
+    // Создаем таблицу users, если она не существует
+    db.run(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        first_name TEXT NOT NULL,
+        last_name TEXT NOT NULL,
+        phone TEXT NOT NULL UNIQUE,
+        email TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL,
+        role TEXT DEFAULT 'user',
+        avatar TEXT DEFAULT '/img/default-avatar.jpg',
+        reset_token TEXT,
+        reset_token_expires INTEGER,
+        failed_login_attempts INTEGER DEFAULT 0,
+        last_failed_login INTEGER
+      )
+    `, (err) => {
+      if (err) {
+        console.error('Error creating users table:', err);
       }
     });
   }
@@ -87,10 +125,13 @@ app.post('/api/register', async (req, res) => {
     // Хеширование пароля
     const hashedPassword = await bcrypt.hash(password, 10);
     
-    // Сохранение пользователя
+    // Определяем роль пользователя
+    const isAdmin = ADMIN_EMAILS.includes(email);
+    
+    // Сохранение пользователя с дефолтной аватаркой
     db.run(
-      `INSERT INTO users (first_name, last_name, phone, email, password) VALUES (?, ?, ?, ?, ?)`,
-      [firstName, lastName, phone, email, hashedPassword],
+      `INSERT INTO users (first_name, last_name, phone, email, password, role) VALUES (?, ?, ?, ?, ?, ?)`,
+      [firstName, lastName, phone, email, hashedPassword, isAdmin ? 'admin' : 'user'],
       function(err) {
         if (err) {
           if (err.message.includes('UNIQUE constraint failed: users.email')) {
@@ -104,7 +145,7 @@ app.post('/api/register', async (req, res) => {
         
         // Получаем данные созданного пользователя
         db.get(
-          `SELECT id, first_name, last_name, email, phone, role FROM users WHERE id = ?`,
+          `SELECT id, first_name, last_name, email, phone, role, avatar FROM users WHERE id = ?`,
           [this.lastID],
           (err, user) => {
             if (err || !user) {
@@ -124,7 +165,8 @@ app.post('/api/register', async (req, res) => {
                 id: user.id,
                 firstName: user.first_name,
                 lastName: user.last_name,
-                role: user.role
+                role: user.role,
+                avatar: user.avatar
               },
               message: 'Регистрация успешна' 
             });
@@ -199,7 +241,8 @@ app.post('/api/login', authLimiter, async (req, res) => {
             id: user.id,
             firstName: user.first_name,
             lastName: user.last_name,
-            role: user.role
+            role: user.role,
+            avatar: user.avatar
           } 
         });
       }
@@ -270,7 +313,7 @@ app.post('/api/forgot-password', (req, res) => {
 // Маршруты для работы с пользователями
 app.get('/api/user', authenticateToken, (req, res) => {
   db.get(
-    `SELECT id, first_name, last_name, email, phone, role FROM users WHERE id = ?`,
+    `SELECT id, first_name, last_name, email, phone, role, avatar FROM users WHERE id = ?`,
     [req.user.userId],
     (err, user) => {
       if (err) {
@@ -284,6 +327,76 @@ app.get('/api/user', authenticateToken, (req, res) => {
       res.json(user);
     }
   );
+});
+
+app.put('/api/user', authenticateToken, (req, res) => {
+  const { firstName, lastName, phone } = req.body;
+  
+  db.run(
+    `UPDATE users SET 
+    first_name = ?,
+    last_name = ?,
+    phone = ?
+    WHERE id = ?`,
+    [firstName, lastName, phone, req.user.userId],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Ошибка при обновлении данных' });
+      }
+      
+      // Возвращаем обновленные данные пользователя
+      db.get(
+        `SELECT id, first_name, last_name, email, phone, role, avatar FROM users WHERE id = ?`,
+        [req.user.userId],
+        (err, user) => {
+          if (err || !user) {
+            return res.status(500).json({ error: 'Ошибка при получении обновленных данных' });
+          }
+          res.json(user);
+        }
+      );
+    }
+  );
+});
+
+// Новый маршрут для обновления аватарки
+app.put('/api/user/avatar', authenticateToken, upload.single('avatar'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Файл не загружен' });
+  }
+
+  // Создаем папку public/img, если ее нет
+  const publicImgPath = path.join(__dirname, 'public', 'img');
+  if (!fs.existsSync(publicImgPath)) {
+    fs.mkdirSync(publicImgPath, { recursive: true });
+  }
+
+  // Новое имя файла
+  const newFileName = `avatar-${req.user.userId}-${Date.now()}${path.extname(req.file.originalname)}`;
+  const targetPath = path.join(publicImgPath, newFileName);
+  const avatarUrl = `/img/${newFileName}`;
+
+  // Перемещаем файл в публичную папку
+  fs.rename(req.file.path, targetPath, (err) => {
+    if (err) {
+      console.error('Ошибка при перемещении файла:', err);
+      return res.status(500).json({ error: 'Ошибка при сохранении файла' });
+    }
+
+    // Обновляем аватар в базе данных
+    db.run(
+      `UPDATE users SET avatar = ? WHERE id = ?`,
+      [avatarUrl, req.user.userId],
+      function(err) {
+        if (err) {
+          console.error('Ошибка при обновлении аватарки в БД:', err);
+          return res.status(500).json({ error: 'Ошибка при обновлении аватарки' });
+        }
+        
+        res.json({ avatar: avatarUrl });
+      }
+    );
+  });
 });
 
 // Маршруты для товаров
@@ -375,4 +488,14 @@ app.use((err, req, res, next) => {
 // Запуск сервера
 app.listen(port, () => {
   console.log(`Сервер запущен на http://localhost:${port}`);
+  
+  // Создаем необходимые папки при запуске
+  const foldersToCreate = ['uploads', 'public/img'];
+  foldersToCreate.forEach(folder => {
+    const folderPath = path.join(__dirname, folder);
+    if (!fs.existsSync(folderPath)) {
+      fs.mkdirSync(folderPath, { recursive: true });
+      console.log(`Создана папка: ${folderPath}`);
+    }
+  });
 });

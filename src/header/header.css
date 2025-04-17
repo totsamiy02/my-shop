@@ -10,14 +10,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 20px; /* Добавляем отступ между элементами */
+    gap: 20px;
 }
 
 .header_left {
     display: flex;
     align-items: center;
     gap: 64px;
-    flex-wrap: wrap; /* Для адаптива */
+    flex-wrap: wrap;
 }
 
 .logo {
@@ -36,68 +36,68 @@
 .header_right {
     display: flex;
     align-items: center;
-    gap: 35px; /* Заменяем margin-right на gap */
+    gap: 20px;
 }
 
 .icon {
     height: 24px;
-    width: 24px; /* Фиксируем ширину для одинаковых иконок */
+    width: 24px;
     cursor: pointer;
     transition: transform 0.2s ease;
     object-fit: contain;
 }
 
 .icon:hover {
-    transform: scale(1.15); /* Увеличиваем эффект ховера */
+    transform: scale(1.15);
 }
 
-/* Адаптив */
-@media (max-width: 768px) {
-    .header {
-        padding: 15px 0;
-    }
-    
-    .header_main {
-        flex-direction: row; /* Оставляем в строку на мобильных */
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 15px;
-    }
-    
-    .header_left {
-        gap: 30px;
-        justify-content: center;
-        width: 100%;
-    }
-    
-    .logo img {
-        height: 36px;
-    }
-    
-    .header_right {
-        gap: 25px;
-    }
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    padding: 5px 10px;
+    border-radius: 20px;
 }
 
-@media (max-width: 480px) {
-    .header_left {
-        gap: 20px;
-    }
-    
-    .header_right {
-        gap: 20px;
-    }
-    
-    .icon {
-        height: 22px;
-        width: 22px;
-    }
+.user-profile:hover {
+    background-color: #f5f5f5;
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #ff6b00;
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.user-name {
+    font-weight: 500;
+    color: #333;
+    font-size: 0.95rem;
+    white-space: nowrap;
+}
+
+.user-role {
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.user-role.admin {
+    color: #ff6b00;
+    font-weight: 500;
 }
 
 .favorites-link {
     position: relative;
     display: inline-block;
-    margin-right: 20px;
 }
 
 .favorites-badge {
@@ -117,10 +117,6 @@
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
-
-
-/* модальное окно аунтификация */
-
 .auth-button {
     background-color: #ff6b00;
     color: white;
@@ -129,35 +125,12 @@
     border-radius: 4px;
     font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.3s;
-    margin-right: 15px;
+    transition: all 0.3s;
 }
 
 .auth-button:hover {
     background-color: #e05d00;
-}
-
-.user-info {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    margin-right: 15px;
-    cursor: pointer;
-}
-
-.user-name {
-    font-weight: 500;
-    color: #333;
-}
-
-.user-role {
-    font-size: 12px;
-    color: #666;
-}
-
-.user-role.admin {
-    color: #ff6b00;
-    font-weight: 500;
+    transform: translateY(-1px);
 }
 
 .logout-button {
@@ -165,11 +138,80 @@
     border: 1px solid #ddd;
     padding: 8px 12px;
     border-radius: 4px;
-    margin-left: 15px;
     cursor: pointer;
     transition: all 0.3s;
+    font-size: 0.85rem;
 }
 
 .logout-button:hover {
     background-color: #f5f5f5;
+}
+
+@media (max-width: 768px) {
+    .header {
+        padding: 15px 0;
+    }
+    
+    .header_main {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 15px;
+    }
+    
+    .header_left {
+        gap: 30px;
+        justify-content: center;
+        width: 100%;
+    }
+    
+    .logo img {
+        height: 36px;
+    }
+    
+    .header_right {
+        gap: 15px;
+    }
+    
+    .user-name {
+        display: none;
+    }
+    
+    .user-profile {
+        padding: 5px;
+    }
+    
+    .user-avatar {
+        width: 36px;
+        height: 36px;
+    }
+}
+
+@media (max-width: 480px) {
+    .header_left {
+        gap: 20px;
+    }
+    
+    .header_right {
+        gap: 10px;
+    }
+    
+    .icon {
+        height: 22px;
+        width: 22px;
+    }
+    
+    .user-avatar {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .auth-button {
+        padding: 6px 12px;
+        font-size: 0.85rem;
+    }
+    
+    .logout-button {
+        padding: 6px 10px;
+    }
 }

@@ -15,6 +15,8 @@ import Basket from './basket/basket.jsx';
 import FavoritesPage from './FavoritesPage/FavoritesPage.jsx';
 
 import ProfilePage from './AuthModal/profile/ProfilePage.jsx';
+import AdminPanel from './AuthModal/admin/AdminPanel.jsx';
+import PrivateRoute from './AuthModal/admin/PrivateRoute.jsx'; // Добавляем импорт
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -34,6 +36,7 @@ root.render(
         <Route path="/basket" element={<Basket />} />
         <Route path="/favorites" element={<FavoritesPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/admin" element={<PrivateRoute adminOnly={true}><AdminPanel /></PrivateRoute>} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>

@@ -11,12 +11,11 @@ import AuthModal from '../AuthModal/AuthModal';
 function Header() {
     const favoritesCount = useFavorites();
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-    const [authMode, setAuthMode] = useState('login'); // 'login' или 'register'
+    const [authMode, setAuthMode] = useState('login');
     const [user, setUser] = useState(null);
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Проверка аутентификации при загрузке компонента
         const token = localStorage.getItem('token');
         if (token) {
             fetchUserData(token);
@@ -25,7 +24,7 @@ function Header() {
 
     const fetchUserData = async (token) => {
         try {
-            const response = await fetch('http://localhost:3001/api/user', {
+            const response = await fetch('/api/user', {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -33,7 +32,13 @@ function Header() {
             
             if (response.ok) {
                 const userData = await response.json();
-                setUser(userData);
+                setUser({
+                    id: userData.id,
+                    firstName: userData.first_name,
+                    lastName: userData.last_name,
+                    role: userData.role,
+                    avatar: userData.avatar || '/img/avatar.jpg'
+                });
             } else {
                 localStorage.removeItem('token');
             }
@@ -60,6 +65,11 @@ function Header() {
         }
     };
 
+    const handleAvatarError = (e) => {
+        e.target.onerror = null; // Предотвращаем бесконечный цикл
+        e.target.src = '/img/avatar.jpg';
+    };
+
     return (
         <div className="header">
             <div className="header_main container">
@@ -70,11 +80,19 @@ function Header() {
                 </div>
                 <div className="header_right">
                     {user ? (
-                        <div className="user-info" onClick={handleUserClick}>
-                            <span className="user-name">{user.firstName} {user.lastName}</span>
-                            <span className={`user-role ${user.role}`}>
-                                {user.role === 'admin' ? 'Администратор' : 'Пользователь'}
-                            </span>
+                        <div className="user-profile" onClick={handleUserClick}>
+                            <img 
+                                src={user.avatar} 
+                                alt="Аватар" 
+                                className="user-avatar"
+                                onError={handleAvatarError}
+                            />
+                            <div className="user-info">
+                                <span className="user-name">{user.firstName} {user.lastName}</span>
+                                <span className={`user-role ${user.role}`}>
+                                    {user.role === 'admin' ? 'Администратор' : 'Пользователь'}
+                                </span>
+                            </div>
                         </div>
                     ) : (
                         <button 
