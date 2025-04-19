@@ -4,6 +4,7 @@ import Header from '../../header/header.jsx';
 import Footer from '../../footer/footer.jsx';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import ConfirmationModal from '../../Notification/ConfirmationModal.jsx';
 import './ProfilePage.css';
 
 function ProfilePage() {
@@ -22,6 +23,8 @@ function ProfilePage() {
     });
     const [avatarFile, setAvatarFile] = useState(null);
     const [showPasswordForm, setShowPasswordForm] = useState(false);
+    const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+    const [pendingAction, setPendingAction] = useState(null);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -193,6 +196,20 @@ function ProfilePage() {
         }
     };
 
+    const handleActionConfirmation = (action) => {
+        setPendingAction(action);
+        setShowConfirmationModal(true);
+    };
+
+    const handleConfirmAction = () => {
+        setShowConfirmationModal(false);
+        if (pendingAction === 'saveProfile') {
+            handleSaveProfile();
+        } else if (pendingAction === 'savePassword') {
+            handleSavePassword();
+        }
+    };
+
     const navigateToAdminPanel = () => {
         navigate('/admin');
     };
@@ -351,7 +368,7 @@ function ProfilePage() {
                                                 </button>
                                                 <button 
                                                     className="save-password-button"
-                                                    onClick={handleSavePassword}
+                                                    onClick={() => handleActionConfirmation('savePassword')}
                                                     disabled={
                                                         !passwordData.currentPassword ||
                                                         !passwordData.newPassword ||
@@ -376,7 +393,7 @@ function ProfilePage() {
                                         </button>
                                         <button 
                                             className="save-button"
-                                            onClick={handleSaveProfile}
+                                            onClick={() => handleActionConfirmation('saveProfile')}
                                         >
                                             Сохранить профиль
                                         </button>
@@ -423,6 +440,16 @@ function ProfilePage() {
             </main>
             
             <Footer />
+
+            <ConfirmationModal
+                isOpen={showConfirmationModal}
+                onClose={() => setShowConfirmationModal(false)}
+                onConfirm={handleConfirmAction}
+                title="Подтверждение действия"
+                message="Вы уверены, что хотите сохранить изменения?"
+                confirmText="Сохранить"
+                cancelText="Отмена"
+            />
         </div>
     );
 }

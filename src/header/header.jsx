@@ -101,7 +101,7 @@ function Header() {
                                     onError={handleAvatarError}
                                 />
                                 <div className="user-info">
-                                    <span className="user-name">{user.firstName} {user.lastName}</span>
+                                    <span className="user-name">{user.lastName} {user.firstName}</span>
                                     <span className={`user-role ${user.role}`}>
                                         {user.role === 'admin' ? 'Администратор' : 'Пользователь'}
                                     </span>
