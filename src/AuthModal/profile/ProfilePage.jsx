@@ -97,7 +97,6 @@ function ProfilePage() {
         try {
             const token = localStorage.getItem('token');
             
-            // Обновляем аватарку, если она была изменена
             if (avatarFile) {
                 const avatarFormData = new FormData();
                 avatarFormData.append('avatar', avatarFile);
@@ -121,7 +120,6 @@ function ProfilePage() {
                 }));
             }
             
-            // Обновляем основные данные
             const profileResponse = await fetch('/api/user', {
                 method: 'PUT',
                 headers: {
@@ -215,12 +213,12 @@ function ProfilePage() {
             <main className="profile-container">
                 <div className="profile-header">
                     <h1>Личный кабинет</h1>
-                    {!editMode && (
+                    {user?.role === 'admin' && (
                         <button 
-                            className="edit-button"
-                            onClick={() => setEditMode(true)}
+                            className="admin-panel-button"
+                            onClick={navigateToAdminPanel}
                         >
-                            Редактировать
+                            Панель администратора
                         </button>
                     )}
                 </div>
@@ -374,13 +372,13 @@ function ProfilePage() {
                                                 setShowPasswordForm(false);
                                             }}
                                         >
-                                            Отмена
+                                            Отменить изменения
                                         </button>
                                         <button 
                                             className="save-button"
                                             onClick={handleSaveProfile}
                                         >
-                                            Сохранить изменения
+                                            Сохранить профиль
                                         </button>
                                     </div>
                                 </>
@@ -408,14 +406,15 @@ function ProfilePage() {
                                             {user.role === 'admin' ? 'Администратор' : 'Пользователь'}
                                         </span>
                                     </div>
-                                    {user.role === 'admin' && (
+
+                                    <div className="profile-actions">
                                         <button 
-                                            className="admin-panel-button"
-                                            onClick={navigateToAdminPanel}
+                                            className="edit-button"
+                                            onClick={() => setEditMode(true)}
                                         >
-                                            Панель администратора
+                                            Редактировать профиль
                                         </button>
-                                    )}
+                                    </div>
                                 </>
                             )}
                         </div>

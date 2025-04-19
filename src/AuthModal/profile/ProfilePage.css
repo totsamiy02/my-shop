@@ -27,20 +27,21 @@
     margin: 0;
 }
 
-.edit-button {
-    background-color: #ff6b00;
+.admin-panel-button {
+    background-color: #333;
     color: white;
     border: none;
     padding: 10px 20px;
-    border-radius: 5px;
+    border-radius: 30px;
     font-size: 1rem;
     cursor: pointer;
     transition: all 0.3s;
 }
 
-.edit-button:hover {
-    background-color: #e05d00;
+.admin-panel-button:hover {
+    background-color: #222;
     transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .profile-content {
@@ -141,6 +142,30 @@
     font-weight: 500;
 }
 
+.profile-actions {
+    margin-top: 30px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.edit-button {
+    background-color: transparent;
+    color: #ff6b00;
+    border: 2px solid #ff6b00;
+    padding: 10px 20px;
+    border-radius: 30px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.edit-button:hover {
+    background-color: #ff6b00;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(255, 107, 0, 0.2);
+}
+
 .form-group {
     display: flex;
     flex-direction: column;
@@ -167,39 +192,115 @@
     box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.2);
 }
 
+.change-password-button {
+    display: inline-flex;
+    align-items: center;
+    background-color: transparent;
+    color: #ff6b00;
+    border: 2px solid #ff6b00;
+    padding: 8px 20px;
+    border-radius: 30px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin: 15px 0;
+}
+
+.change-password-button:hover {
+    background-color: rgba(255, 107, 0, 0.1);
+}
+
+.password-form {
+    margin: 20px 0;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #eee;
+}
+
+.password-form h3 {
+    margin-top: 0;
+    color: #333;
+    font-size: 1.1rem;
+    margin-bottom: 20px;
+}
+
+.password-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.cancel-password-button {
+    background-color: transparent;
+    color: #666;
+    border: 2px solid #ddd;
+    padding: 8px 20px;
+    border-radius: 30px;
+    cursor: pointer;
+}
+
+.cancel-password-button:hover {
+    background-color: #f0f0f0;
+}
+
+.save-password-button {
+    background-color: #ff6b00;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 30px;
+    cursor: pointer;
+}
+
+.save-password-button:hover {
+    background-color: #e05d00;
+}
+
+.save-password-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
 .form-actions {
     display: flex;
     gap: 15px;
     margin-top: 20px;
-}
-
-.save-button, .cancel-button {
-    padding: 10px 20px;
-    border-radius: 5px;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: all 0.3s;
+    justify-content: flex-end;
 }
 
 .save-button {
     background-color: #ff6b00;
     color: white;
     border: none;
+    padding: 10px 25px;
+    border-radius: 30px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
 }
 
 .save-button:hover {
     background-color: #e05d00;
     transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(255, 107, 0, 0.2);
 }
 
 .cancel-button {
-    background-color: #f0f0f0;
-    color: #333;
-    border: 1px solid #ddd;
+    background-color: transparent;
+    color: #666;
+    border: 2px solid #ddd;
+    padding: 10px 25px;
+    border-radius: 30px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
 }
 
 .cancel-button:hover {
-    background-color: #e0e0e0;
+    background-color: #f0f0f0;
+    border-color: #ccc;
 }
 
 .loading-container {
@@ -231,6 +332,12 @@
         padding: 20px;
     }
     
+    .profile-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
     .profile-header h1 {
         font-size: 1.5rem;
     }
@@ -239,119 +346,27 @@
         width: 120px;
         height: 120px;
     }
+
+    .admin-panel-button,
+    .edit-button {
+        width: 100%;
+    }
+
+    .form-actions,
+    .password-form-actions {
+        flex-direction: column;
+    }
+
+    .save-button,
+    .cancel-button,
+    .save-password-button,
+    .cancel-password-button {
+        width: 100%;
+    }
 }
 
 @media (max-width: 480px) {
     .profile-container {
         padding: 20px 10px;
     }
-    
-    .profile-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 15px;
-    }
-    
-    .edit-button {
-        width: 100%;
-    }
-    
-    .form-actions {
-        flex-direction: column;
-    }
-    
-    .save-button, .cancel-button {
-        width: 100%;
-    }
-}
-
-
-
-
-
-
-
-.change-password-button {
-    background-color: transparent;
-    color: #ff6b00;
-    border: none;
-    padding: 10px 0;
-    font-size: 0.9rem;
-    cursor: pointer;
-    text-align: left;
-    margin: 10px 0;
-}
-
-.change-password-button:hover {
-    text-decoration: underline;
-}
-
-.password-form {
-    margin: 20px 0;
-    padding: 20px;
-    background-color: #f9f9f9;
-    border-radius: 8px;
-    border: 1px solid #eee;
-}
-
-.password-form h3 {
-    margin-top: 0;
-    color: #333;
-    font-size: 1.1rem;
-    margin-bottom: 20px;
-}
-
-.password-form-actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-}
-
-.cancel-password-button {
-    background-color: #f0f0f0;
-    color: #333;
-    border: 1px solid #ddd;
-    padding: 8px 15px;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-.cancel-password-button:hover {
-    background-color: #e0e0e0;
-}
-
-.save-password-button {
-    background-color: #ff6b00;
-    color: white;
-    border: none;
-    padding: 8px 15px;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-.save-password-button:hover {
-    background-color: #e05d00;
-}
-
-.save-password-button:disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
-}
-
-.admin-panel-button {
-    background-color: #333;
-    color: white;
-    border: none;
-    padding: 12px 20px;
-    border-radius: 5px;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: all 0.3s;
-    margin-top: 20px;
-    width: 100%;
-}
-
-.admin-panel-button:hover {
-    background-color: #222;
-    transform: translateY(-2px);
 }
