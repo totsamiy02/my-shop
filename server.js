@@ -603,17 +603,48 @@ app.put('/api/admin/products/:id', authenticateToken, upload.single('image'), (r
 app.delete('/api/admin/products/:id', authenticateToken, (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
     
-    db.run(
-        `DELETE FROM products WHERE id = ?`,
-        [req.params.id],
-        function(err) {
+    db.get(`SELECT image FROM products WHERE id = ?`, [req.params.id], (err, product) => {
+        if (err) {
+            console.error('Ошибка при получении товара:', err);
+            return res.status(500).json({ error: 'Ошибка при получении товара' });
+        }
+        
+        if (!product) {
+            return res.status(404).json({ error: 'Товар не найден' });
+        }
+
+        // Удаляем товар из БД
+        db.run(`DELETE FROM products WHERE id = ?`, [req.params.id], function(err) {
             if (err) {
-                console.error('Error deleting product:', err);
+                console.error('Ошибка при удалении товара:', err);
                 return res.status(500).json({ error: 'Ошибка при удалении товара' });
             }
-            res.json({ success: true, message: 'Товар успешно удален' });
-        }
-    );
+
+            // Если есть изображение - удаляем файл
+            if (product.image && product.image.startsWith('/uploads/')) {
+                try {
+                    const filename = product.image.split('/uploads/')[1];
+                    const imagePath = path.join(__dirname, 'uploads', filename);
+                    
+                    console.log(`Пытаемся удалить: ${imagePath}`);
+                    
+                    if (fs.existsSync(imagePath)) {
+                        fs.unlinkSync(imagePath);
+                        console.log('Изображение успешно удалено');
+                    } else {
+                        console.log('Файл изображения не найден');
+                    }
+                } catch (fileErr) {
+                    console.error('Ошибка при удалении файла:', fileErr);
+                }
+            }
+            
+            res.json({ 
+                success: true, 
+                message: product.image ? 'Товар и изображение удалены' : 'Товар удален' 
+            });
+        });
+    });
 });
 
 // Маршруты для админки категорий

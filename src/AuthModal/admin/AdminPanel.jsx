@@ -4,6 +4,7 @@ import Header from '../../header/header.jsx';
 import Footer from '../../footer/footer.jsx';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import ConfirmationModal from '../../Notification/ConfirmationModal.jsx';
 import './AdminPanel.css';
 
 function AdminPanel() {
@@ -13,6 +14,9 @@ function AdminPanel() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('add');
     const [editingProduct, setEditingProduct] = useState(null);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showSaveModal, setShowSaveModal] = useState(false);
+    const [productToDelete, setProductToDelete] = useState(null);
     
     const [productForm, setProductForm] = useState({
         name: '',
@@ -85,6 +89,16 @@ function AdminPanel() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         
+        if (!productForm.name || !productForm.price) {
+            toast.error('Пожалуйста, заполните обязательные поля (Название и Цена)');
+            return;
+        }
+        
+        setShowSaveModal(true);
+    };
+
+    const confirmSave = async () => {
+        setShowSaveModal(false);
         try {
             const token = localStorage.getItem('token');
             const formData = new FormData();
@@ -167,14 +181,16 @@ function AdminPanel() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const handleDeleteProduct = async (productId) => {
-        if (!window.confirm('Вы уверены, что хотите удалить этот товар?')) {
-            return;
-        }
-        
+    const handleDeleteClick = (productId) => {
+        setProductToDelete(productId);
+        setShowDeleteModal(true);
+    };
+
+    const confirmDelete = async () => {
+        setShowDeleteModal(false);
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`/api/admin/products/${productId}`, {
+            const response = await fetch(`/api/admin/products/${productToDelete}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -184,7 +200,7 @@ function AdminPanel() {
                 throw new Error(errorData.error || 'Ошибка при удалении товара');
             }
             
-            setProducts(prev => prev.filter(p => p.id !== productId));
+            setProducts(prev => prev.filter(p => p.id !== productToDelete));
             toast.success('Товар успешно удален!');
         } catch (error) {
             toast.error(error.message);
@@ -436,7 +452,7 @@ function AdminPanel() {
                                                 </button>
                                                 <button 
                                                     className="admin-delete-button"
-                                                    onClick={() => handleDeleteProduct(product.id)}
+                                                    onClick={() => handleDeleteClick(product.id)}
                                                 >
                                                     Удалить
                                                 </button>
@@ -451,6 +467,28 @@ function AdminPanel() {
             </main>
             
             <Footer />
+
+            {/* Модальное окно подтверждения удаления */}
+            <ConfirmationModal
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
+                onConfirm={confirmDelete}
+                title="Подтверждение удаления"
+                message="Вы уверены, что хотите удалить этот товар? Это действие нельзя отменить."
+                confirmText="Удалить"
+            />
+            
+            {/* Модальное окно подтверждения сохранения */}
+            <ConfirmationModal
+                isOpen={showSaveModal}
+                onClose={() => setShowSaveModal(false)}
+                onConfirm={confirmSave}
+                title={editingProduct ? "Подтверждение изменений" : "Подтверждение добавления"}
+                message={editingProduct 
+                    ? "Вы уверены, что хотите сохранить изменения товара?" 
+                    : "Вы уверены, что хотите добавить новый товар?"}
+                confirmText={editingProduct ? "Сохранить" : "Добавить"}
+            />
         </div>
     );
 }
