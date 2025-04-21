@@ -2,29 +2,37 @@ import { useState, useEffect } from 'react';
 import './ProductModal.css';
 import heartOutline from '../../img/сердце.svg';
 import heartFilled from '../../img/сердце черное.svg';
+import { useAuth } from '../../hook/AuthContext';
 
 function ProductModal({ product, onClose, onAddToCart }) {
     const [isZoomed, setIsZoomed] = useState(false);
     const [isClosing, setIsClosing] = useState(false);
     const [isZoomClosing, setIsZoomClosing] = useState(false);
     const [isFavorite, setIsFavorite] = useState(false);
+    const { user } = useAuth();
 
     useEffect(() => {
-        const handleStorageChange = () => {
-            const favorites = JSON.parse(localStorage.getItem('favorites')) || [];
-            setIsFavorite(favorites.some(item => item.id === product.id));
+        if (!user) {
+            setIsFavorite(false);
+            return;
+        }
+
+        const checkFavoriteStatus = async () => {
+            try {
+                const response = await fetch(`/api/favorites/check/${product.id}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                const data = await response.json();
+                setIsFavorite(data.isFavorite);
+            } catch (error) {
+                console.error('Error checking favorite status:', error);
+            }
         };
 
-        handleStorageChange();
-
-        window.addEventListener('favoritesUpdated', handleStorageChange);
-        window.addEventListener('storage', handleStorageChange);
-
-        return () => {
-            window.removeEventListener('favoritesUpdated', handleStorageChange);
-            window.removeEventListener('storage', handleStorageChange);
-        };
-    }, [product.id]);
+        checkFavoriteStatus();
+    }, [product.id, user]);
 
     const handleClose = () => {
         setIsClosing(true);
@@ -44,27 +52,35 @@ function ProductModal({ product, onClose, onAddToCart }) {
         }, 300);
     };
 
-    const toggleFavorite = (e) => {
+    const toggleFavorite = async (e) => {
         e.stopPropagation();
-        const favorites = JSON.parse(localStorage.getItem('favorites')) || [];
         
-        if (isFavorite) {
-            const updatedFavorites = favorites.filter(item => item.id !== product.id);
-            localStorage.setItem('favorites', JSON.stringify(updatedFavorites));
-        } else {
-            const productToAdd = { 
-                id: product.id, 
-                image: product.image, 
-                title: product.name, 
-                price: product.price 
-            };
-            
-            if (!favorites.some(item => item.id === product.id)) {
-                localStorage.setItem('favorites', JSON.stringify([...favorites, productToAdd]));
-            }
+        if (!user) {
+            alert('Для добавления в избранное необходимо войти в систему');
+            return;
         }
-        
-        window.dispatchEvent(new Event('favoritesUpdated'));
+
+        try {
+            if (isFavorite) {
+                await fetch(`/api/favorites/${product.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+            } else {
+                await fetch(`/api/favorites/${product.id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+            }
+            setIsFavorite(!isFavorite);
+            window.dispatchEvent(new Event('favoritesUpdated'));
+        } catch (error) {
+            console.error('Error toggling favorite:', error);
+        }
     };
 
     return (
@@ -106,10 +122,11 @@ function ProductModal({ product, onClose, onAddToCart }) {
                                 className="add-to-basket-button"
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    onAddToCart({  // Используем новое имя пропса
+                                    onAddToCart({
                                         image: product.image,
                                         title: product.name,
-                                        price: product.price
+                                        price: product.price,
+                                        id: product.id
                                     });
                                     handleClose();
                                 }}

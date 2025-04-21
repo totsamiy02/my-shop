@@ -663,6 +663,12 @@ app.get('/api/admin/categories', authenticateToken, (req, res) => {
     );
 });
 
+const favoritesRoutes = require('./src/routes/favoritesRoutes');
+app.use('/api/favorites', (req, res, next) => {
+    req.db = db; // Передаем экземпляр базы данных
+    next();
+}, favoritesRoutes);
+
 // Статические файлы
 app.use(express.static(path.join(__dirname, 'public')));
 

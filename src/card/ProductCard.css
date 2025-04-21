@@ -1,6 +1,8 @@
+/* ProductCard.css - оптимизированная версия */
 .product-card {
-    width: 100%; /* можно оставить, но лучше убрать */
-    max-width: 100%; /* добавь это */
+    position: relative;
+    width: 100%;
+    max-width: 100%;
     min-height: 450px;
     background: #fff;
     border-radius: 30px;
@@ -10,7 +12,7 @@
     display: flex;
     flex-direction: column;
     cursor: pointer;
-    position: relative;
+    border: 1px solid #e0e0e0;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
@@ -19,20 +21,13 @@
     box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
 }
 
-.product-image-container {
-    width: 100%;
-    height: 200px;
-    overflow: hidden;
-    margin-bottom: 15px;
-    border-radius: 20px;
-    background: #f9f9f9;
-}
-
 .product-image {
     width: 100%;
-    height: 100%;
+    height: 200px;
     object-fit: contain;
-    transition: transform 0.3s ease;
+    margin-bottom: 10px;
+    border-radius: 20px;
+    background: #f9f9f9;
 }
 
 .product-info {
@@ -44,23 +39,27 @@
 }
 
 .product-title {
-    font-weight: 600;
     font-size: 16px;
+    font-weight: 600;
     line-height: 1.4;
     color: #333;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .product-price {
     font-weight: 700;
     color: #FF6B00;
     font-size: 18px;
-    margin: 8px 0;
+    margin: 8px 0 0;
 }
 
 .product-stock {
     font-size: 14px;
     color: #666;
-    margin-bottom: 15px;
+    margin: 0 0 15px;
 }
 
 .add-to-basket-button {
@@ -101,6 +100,30 @@
     cursor: pointer;
     z-index: 2;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 0;
+}
+
+.favorite-button.active {
+    background: rgba(255, 107, 0, 0.1);
+}
+
+.favorite-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.favorite-spinner {
+    border: 2px solid rgba(255, 107, 0, 0.2);
+    border-top: 2px solid #ff6b00;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 /* Адаптивность */
@@ -110,7 +133,7 @@
         padding: 15px;
     }
     
-    .product-image-container {
+    .product-image {
         height: 180px;
     }
     
@@ -128,12 +151,12 @@
         min-height: 380px;
     }
     
-    .product-image-container {
+    .product-image {
         height: 160px;
     }
 }
 
-
+/* Стили для списка продуктов (перенесены из дублирующих селекторов) */
 .product-list-container {
     padding: 20px 0 60px;
     max-width: 1200px;
@@ -231,7 +254,7 @@
     color: #666;
 }
 
-/* Адаптивность */
+/* Адаптивность для списка продуктов */
 @media (max-width: 768px) {
     .product-list-header h2 {
         font-size: 24px;

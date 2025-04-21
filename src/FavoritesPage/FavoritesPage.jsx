@@ -1,141 +1,171 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Header from '../header/header';
 import Footer from '../footer/footer';
-import ProductModal from '../card/modal/ProductModal';
+import ProductCard from '../card/ProductCard';
 import Notification from '../Notification/Notification';
 import './FavoritesPage.css';
-import heartOutline from '../img/сердце.svg';
-import heartFilled from '../img/сердце черное.svg';
+import { useAuth } from '../hook/AuthContext';
 
 function FavoritesPage() {
+    const { user } = useAuth();
     const [favorites, setFavorites] = useState([]);
     const [selectedProduct, setSelectedProduct] = useState(null);
-    const [products, setProducts] = useState([]);
     const [showNotification, setShowNotification] = useState(false);
+    const navigate = useNavigate();
+
+    const fetchFavorites = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token || !user) {
+                setFavorites([]);
+                return;
+            }
+
+            const response = await fetch('/api/favorites', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.status === 401 || response.status === 403) {
+                setFavorites([]);
+                return;
+            }
+
+            if (!response.ok) throw new Error('Failed to fetch favorites');
+            
+            const data = await response.json();
+            setFavorites(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error('Error fetching favorites:', error);
+            setFavorites([]);
+        }
+    };
 
     useEffect(() => {
-        const updateFavorites = () => {
-            const savedFavorites = JSON.parse(localStorage.getItem('favorites')) || [];
-            setFavorites(savedFavorites);
-        };
+        if (user) {
+            fetchFavorites();
+        } else {
+            setFavorites([]);
+        }
 
-        fetch('/api/products')
-            .then(res => res.json())
-            .then(data => setProducts(data))
-            .catch(error => console.error('Ошибка загрузки товаров:', error));
-
-        updateFavorites();
-        window.addEventListener('favoritesUpdated', updateFavorites);
-
+        const handleUpdate = () => fetchFavorites();
+        window.addEventListener('favoritesUpdated', handleUpdate);
+        
         return () => {
-            window.removeEventListener('favoritesUpdated', updateFavorites);
+            window.removeEventListener('favoritesUpdated', handleUpdate);
         };
-    }, []);
-
-    const removeFromFavorites = (productId) => {
-        const updatedFavorites = favorites.filter(item => item.id !== productId);
-        setFavorites(updatedFavorites);
-        localStorage.setItem('favorites', JSON.stringify(updatedFavorites));
-        window.dispatchEvent(new Event('favoritesUpdated'));
-    };
+    }, [user]);
 
     const handleAddToBasket = (product) => {
         const basket = JSON.parse(localStorage.getItem('basket')) || [];
-        const existingItem = basket.find(item => item.title === product.title);
+        const existingItem = basket.find(item => item.id === product.id);
         
         const updatedBasket = existingItem
             ? basket.map(item => 
-                item.title === product.title 
+                item.id === product.id 
                     ? { ...item, quantity: item.quantity + 1 }
                     : item
-            )
-            : [...basket, { ...product, id: Date.now(), quantity: 1 }];
+              )
+            : [...basket, { 
+                id: product.id,
+                title: product.name || product.title, 
+                price: product.price,
+                image: product.image,
+                quantity: 1 
+              }];
         
         localStorage.setItem('basket', JSON.stringify(updatedBasket));
         window.dispatchEvent(new Event('basketUpdated'));
-        
         setShowNotification(true);
         setTimeout(() => setShowNotification(false), 3000);
     };
 
+    if (!user) {
+        return (
+            <>
+                <Header />
+                <div className="auth-required-container">
+                    <div className="auth-required-content">
+                        <h2>Требуется авторизация</h2>
+                        <p>Войдите в аккаунт, чтобы просматривать избранные товары</p>
+                        <button 
+                            className="auth-button"
+                            onClick={() => navigate('/login')}
+                        >
+                            Войти
+                        </button>
+                    </div>
+                </div>
+                <Footer />
+            </>
+        );
+    }
+
     return (
         <>
-            <Header/>
-            <div className="favorites-page">
-                <div className="favorites-header">
-                    <h1>Избранное</h1>
-                    {favorites.length > 0 && (
-                        <div className="favorites-count">{favorites.length} {favorites.length === 1 ? 'товар' : 
-                            favorites.length > 1 && favorites.length < 5 ? 'товара' : 'товаров'}</div>
-                    )}
-                </div>
-
+            <Header />
+            
+            <div className="favorites-container">
+                <h1 className="favorites-title">Избранное</h1>
+                
                 {favorites.length === 0 ? (
                     <div className="empty-favorites">
-                        <div className="empty-icon">
-                            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#FF6B00">
-                                <path d="M19.5 12.572L12 20l-7.5-7.428A5 5 0 1 1 12 6.006a5 5 0 1 1 7.5 6.572"/>
-                            </svg>
-                        </div>
+                        <div className="empty-icon">♡</div>
                         <h2>В избранном пока ничего нет</h2>
-                        <p>Сохраняйте понравившиеся товары, нажимая на ♡</p>
-                        <Link to="/" className="back-to-catalog">Перейти в каталог</Link>
+                        <p>Добавляйте товары, нажимая на значок сердца</p>
+                        <Link to="/" className="browse-button">
+                            Перейти в каталог
+                        </Link>
                     </div>
                 ) : (
                     <div className="favorites-grid">
-                        {favorites.map(product => {
-                            const fullProduct = products.find(p => p.id === product.id) || product;
-                            return (
-                                <div key={product.id} className="product-card">
-                                    <div className="card-image">
-                                        <img 
-                                            src={product.image} 
-                                            alt={product.title} 
-                                            onClick={() => setSelectedProduct(fullProduct)}
-                                        />
-                                        <button 
-                                            className="favorite-button active"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                removeFromFavorites(product.id);
-                                            }}
-                                            aria-label="Удалить из избранного"
-                                        >
-                                            <img src={heartFilled} alt="" />
-                                        </button>
-                                    </div>
-                                    <div className="card-content">
-                                        <h3 className="card-title">{product.title}</h3>
-                                        <div className="card-price">{product.price.toLocaleString()} ₽</div>
-                                        <div className="card-actions">
-                                            <button 
-                                                className="details-button"
-                                                onClick={() => setSelectedProduct(fullProduct)}
-                                            >
-                                                Подробнее
-                                            </button>
-                                            <button 
-                                                className="add-to-cart"
-                                                onClick={() => handleAddToBasket(product)}
-                                            >
-                                                В корзину
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                        {favorites.map(product => (
+                            <ProductCard
+                                key={product.id}
+                                id={product.id}
+                                image={product.image}
+                                title={product.name}
+                                price={product.price}
+                                quantity={product.quantity}
+                                onCardClick={() => setSelectedProduct(product)}
+                                handleAddToBasket={() => handleAddToBasket(product)}
+                            />
+                        ))}
                     </div>
                 )}
             </div>
 
             {selectedProduct && (
-                <ProductModal 
-                    product={selectedProduct} 
-                    onClose={() => setSelectedProduct(null)} 
-                    handleAddToBasket={handleAddToBasket}
-                />
+                <div className="product-modal-overlay">
+                    <div className="product-modal">
+                        <button 
+                            className="modal-close"
+                            onClick={() => setSelectedProduct(null)}
+                        >
+                            &times;
+                        </button>
+                        <img 
+                            src={selectedProduct.image} 
+                            alt={selectedProduct.name} 
+                            className="modal-product-image"
+                        />
+                        <div className="modal-product-info">
+                            <h2>{selectedProduct.name}</h2>
+                            <div className="modal-product-price">{selectedProduct.price}₽</div>
+                            <button
+                                className="modal-add-to-cart"
+                                onClick={() => {
+                                    handleAddToBasket(selectedProduct);
+                                    setSelectedProduct(null);
+                                }}
+                            >
+                                Добавить в корзину
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             <Notification 
@@ -143,8 +173,8 @@ function FavoritesPage() {
                 show={showNotification} 
                 onClose={() => setShowNotification(false)}
             />
-
-            <Footer/>
+            
+            <Footer />
         </>
     );
 }
