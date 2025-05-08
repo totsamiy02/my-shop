@@ -4,7 +4,7 @@ import heartOutline from '../../img/сердце.svg';
 import heartFilled from '../../img/сердце черное.svg';
 import { useAuth } from '../../hook/AuthContext';
 
-function ProductModal({ product, onClose, onAddToCart }) {
+function ProductModal({ product, onClose, onAddToCart, onOrderComplete }) {
     const [isZoomed, setIsZoomed] = useState(false);
     const [isClosing, setIsClosing] = useState(false);
     const [isZoomClosing, setIsZoomClosing] = useState(false);
@@ -54,7 +54,7 @@ function ProductModal({ product, onClose, onAddToCart }) {
 
     const toggleFavorite = async (e) => {
         e.stopPropagation();
-        
+
         if (!user) {
             alert('Для добавления в избранное необходимо войти в систему');
             return;
@@ -83,12 +83,47 @@ function ProductModal({ product, onClose, onAddToCart }) {
         }
     };
 
+    const handleAddToCart = async (e) => {
+        e.stopPropagation();
+
+        // Вызов колбэка, добавление товара в корзину
+        onAddToCart({
+            image: product.image,
+            title: product.name,
+            price: product.price,
+            id: product.id
+        });
+
+        try {
+            // Здесь можно отправить заказ или оформить его (если есть логика отправки на сервер)
+            // Например:
+            const response = await fetch('/api/order', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ productId: product.id, quantity: 1 })
+            });
+
+            if (response.ok) {
+                if (onOrderComplete) onOrderComplete(); // ✅ вызов колбэка из родителя
+            } else {
+                console.error('Ошибка при оформлении заказа');
+            }
+        } catch (error) {
+            console.error('Ошибка запроса оформления:', error);
+        }
+
+        handleClose();
+    };
+
     return (
         <>
             <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} onClick={handleClose}>
                 <div className={`product-modal ${isClosing ? 'closing' : ''}`} onClick={(e) => e.stopPropagation()}>
                     <button className="modal-close-btn" onClick={handleClose}>×</button>
-                    
+
                     <button 
                         className={`modal-favorite-btn ${isFavorite ? 'active' : ''}`} 
                         onClick={toggleFavorite}
@@ -120,16 +155,7 @@ function ProductModal({ product, onClose, onAddToCart }) {
 
                             <button
                                 className="add-to-basket-button"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onAddToCart({
-                                        image: product.image,
-                                        title: product.name,
-                                        price: product.price,
-                                        id: product.id
-                                    });
-                                    handleClose();
-                                }}
+                                onClick={handleAddToCart}
                                 disabled={product.quantity === 0}
                             >
                                 {product.quantity === 0 ? 'Нет в наличии' : 'Добавить в корзину'}

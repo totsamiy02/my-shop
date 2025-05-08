@@ -1,0 +1,122 @@
+{
+    "header": {
+      "logo_alt": "Logo",
+      "favorites": "Favorites",
+      "basket": "Basket",
+      "login": "Login",
+      "logout": "Logout",
+      "admin": "Admin",
+      "user": "User"
+    },
+    "footer": {
+      "favorites": "Favorites",
+      "basket": "Basket",
+      "contacts": "Contacts",
+      "terms": "Terms of service",
+      "language": {
+        "ru": "Rus",
+        "en": "Eng"
+      }
+    },
+    "banner": {
+    "title": "Sports goods",
+    "subtitle": "Best quality at affordable prices"
+    },
+    "product_list": {
+    "filters": "Filters",
+    "sort_by": "Sort by",
+    "price_low_to_high": "Price: Low to High",
+    "price_high_to_low": "Price: High to Low",
+    "add_to_cart": "Add to cart",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page",
+    "of": "of"
+    },
+    "search_filters": {
+        "load_categories_error": "Error loading categories:",
+        "search_placeholder": "Find product...",
+        "clear_search": "Clear search",
+        "filters": "Filters",
+        "hide": "Hide",
+        "price_label": "Price, ₽",
+        "min_price": "Minimum price",
+        "max_price": "Maximum price",
+        "sort_asc": "Sort ascending",
+        "sort_desc": "Sort descending",
+        "category_label": "Category",
+        "select_category": "Select category",
+        "all_categories": "All categories",
+        "reset_all": "Reset all",
+        "apply_filters": "Apply filters",
+        "search_history": "Search history",
+        "clear_history": "Clear history",
+        "clear": "Clear"
+    },
+    "favorites": {
+    "title": "Favorites",
+    "auth_required": "Authorization required",
+    "auth_message": "Please log in to view your favorite items",
+    "login_button": "Log in",
+    "loading": "Loading favorites...",
+    "empty_title": "Your favorites is empty",
+    "empty_message": "Add items by clicking the heart icon",
+    "go_to_catalog": "Go to catalog",
+    "item_added": "Item added to cart"
+    },
+    "basket": {
+        "empty_cart": "Your cart is empty",
+        "empty_message": "But it's never too late to fix that :)",
+        "go_to_catalog": "Go to catalog",
+        "available": "Available",
+        "in_cart": "In cart",
+        "pcs": "pcs",
+        "remove": "Remove",
+        "total": "Total amount",
+        "checkout": "Checkout",
+        "back_to_catalog": "Back to catalog",
+        "load_products_error": "Failed to load products",
+        "load_error": "Error loading data:",
+        "load_error_message": "An error occurred while loading data. Please try again later.",
+        "validation": {
+        "first_name": "Please enter your first name",
+        "phone": "Please enter your phone number",
+        "empty_basket": "Your cart is empty"
+        },
+        "server_error": "Server error",
+        "checkout_error": "Checkout error:"
+    },
+    "contacts": {
+        "office_title": "Our office",
+        "address": "Pushkin st., 10, Moscow, Russia",
+        "phone": "Phone"
+    },
+    "terms": {
+        "title": "Terms of Service",
+        "subtitle": "Please read our store policies",
+        "section1": {
+        "title": "1. General provisions",
+        "content": "These Terms of Service govern the relationship between the online store and users of the site. By using our store services, you agree to these terms. All products and services are provided in accordance with current legislation."
+        },
+        "section2": {
+        "title": "2. Ordering process",
+        "content": "To place an order, you need to add items to your cart and complete the checkout process. We reserve the right to change product prices without prior notice. An order is considered placed after receiving email confirmation."
+        },
+        "section3": {
+        "title": "3. Payment and delivery",
+        "content": "We accept various payment methods: credit cards, e-wallets, cash on delivery. Delivery is carried out by courier service or Russian Post within 1-5 business days. Exact delivery times depend on your region."
+        },
+        "section4": {
+        "title": "4. Returns and exchanges",
+        "content": "You can return items within 14 days of receipt if they have not been used and retain their original condition. To return, you must fill out an application and attach a receipt. Refunds are issued using the same payment method used for purchase."
+        },
+        "section5": {
+        "title": "5. Privacy",
+        "content": "We guarantee the confidentiality of your personal data in accordance with Federal Law No. 152-FZ. Your data is used solely for order processing and is not shared with third parties without your consent."
+        },
+        "section6": {
+        "title": "6. Contact information",
+        "content": "For any questions, you can contact us by phone +7 (XXX) XXX-XX-XX or email info@yourstore.com. Support service hours: 9:00 AM to 9:00 PM, seven days a week."
+        }
+    }
+}

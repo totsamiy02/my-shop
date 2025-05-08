@@ -17,29 +17,33 @@ import FavoritesPage from './FavoritesPage/FavoritesPage.jsx';
 import ProfilePage from './AuthModal/profile/ProfilePage.jsx';
 import AdminPanel from './AuthModal/admin/AdminPanel.jsx';
 import PrivateRoute from './AuthModal/admin/PrivateRoute.jsx';
+import { FavoritesProvider } from './hook/FavoritesContext.js';
+import './i18n.js'; // Добавьте эту строку
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <AuthProvider> {/* Обертываем все приложение в AuthProvider */}
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={
-            <>
-              <Header />
-              <Banner />
-              <ProductList />
-              <Footer />
-            </>
-          } />
-          <Route path="/terms-of-service" element={<TermsOfService />} />
-          <Route path="/contacts" element={<Contacts />} />
-          <Route path="/basket" element={<Basket />} />
-          <Route path="/favorites" element={<FavoritesPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/admin" element={<PrivateRoute adminOnly={true}><AdminPanel /></PrivateRoute>} />
-        </Routes>
-      </BrowserRouter>
+      <FavoritesProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={
+              <>
+                <Header />
+                <Banner />
+                <ProductList />
+                <Footer />
+              </>
+            } />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/contacts" element={<Contacts />} />
+            <Route path="/basket" element={<Basket />} />
+            <Route path="/favorites" element={<FavoritesPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/admin" element={<PrivateRoute adminOnly={true}><AdminPanel /></PrivateRoute>} />
+          </Routes>
+        </BrowserRouter>
+      </FavoritesProvider>
     </AuthProvider>
   </React.StrictMode>
 );

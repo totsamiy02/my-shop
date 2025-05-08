@@ -18,7 +18,6 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
     const handleChange = (e) => {
         const { name, value } = e.target;
         
-        // Форматирование номера телефона
         if (name === 'phone') {
             let formattedValue = value.replace(/\D/g, '');
             
@@ -108,6 +107,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
             
             if (mode === 'login') {
                 onLoginSuccess(data.token, data.user);
+                setTimeout(() => onClose(), 500); // Закрываем с задержкой
             } else {
                 setMessage('Регистрация прошла успешно! Теперь вы можете войти.');
                 onModeChange('login');

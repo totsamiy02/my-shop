@@ -1,73 +1,71 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
+export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
-    const checkAuth = useCallback(async () => {
+    useEffect(() => {
         const token = localStorage.getItem('token');
-        if (!token) {
-            setUser(null);
+        if (token) {
+            fetchUserData(token);
+        } else {
             setIsLoading(false);
-            return;
         }
+    }, []);
 
+    const fetchUserData = async (token) => {
         try {
             const response = await fetch('/api/user', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             
             if (response.ok) {
-                const data = await response.json();
+                const userData = await response.json();
                 setUser({
-                    id: data.id,
-                    firstName: data.first_name,
-                    lastName: data.last_name,
-                    role: data.role,
-                    avatar: data.avatar
+                    id: userData.id,
+                    firstName: userData.first_name,
+                    lastName: userData.last_name,
+                    role: userData.role,
+                    avatar: userData.avatar || '/img/avatar.jpg'
                 });
+                setIsAuthenticated(true);
             } else {
                 logout();
             }
         } catch (error) {
-            console.error('Auth check error:', error);
+            console.error('Ошибка при получении данных пользователя:', error);
             logout();
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    };
 
-    const login = (userData, token) => {
+    const login = (token, userData) => {
         localStorage.setItem('token', token);
         setUser(userData);
+        setIsAuthenticated(true);
         window.dispatchEvent(new Event('authStateChanged'));
+        window.dispatchEvent(new Event('favoritesForceUpdate'));
     };
 
     const logout = () => {
         localStorage.removeItem('token');
         setUser(null);
+        setIsAuthenticated(false);
         window.dispatchEvent(new Event('authStateChanged'));
-        window.dispatchEvent(new Event('favoritesUpdated'));
+        window.dispatchEvent(new Event('favoritesForceUpdate'));
     };
 
-    useEffect(() => {
-        checkAuth();
-        
-        const handleAuthChange = () => checkAuth();
-        window.addEventListener('authStateChanged', handleAuthChange);
-        
-        return () => {
-            window.removeEventListener('authStateChanged', handleAuthChange);
-        };
-    }, [checkAuth]);
-
     return (
-        <AuthContext.Provider value={{ user, isLoading, login, logout, checkAuth }}>
+        <AuthContext.Provider value={{ user, isAuthenticated, isLoading, login, logout }}>
             {children}
         </AuthContext.Provider>
     );
-};
+}
 
-export const useAuth = () => useContext(AuthContext);
+export function useAuth() {
+    return useContext(AuthContext);
+}

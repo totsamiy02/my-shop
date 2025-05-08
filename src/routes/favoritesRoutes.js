@@ -33,42 +33,71 @@ router.get('/check/:productId', authenticateToken, (req, res) => {
     );
 });
 
-// Добавить в избранное
-router.post('/:productId', authenticateToken, (req, res) => {
-    const productId = req.params.productId;
+// Добавляем проверку перед действиями
+router.post('/add', authenticateToken, async (req, res) => {
+    const { productId } = req.body;
     
-    req.db.run(
-        `INSERT INTO favorites (user_id, product_id) VALUES (?, ?)`,
+    // Сначала проверяем, есть ли уже товар в избранном
+    req.db.get(
+        `SELECT 1 FROM favorites WHERE user_id = ? AND product_id = ?`,
         [req.user.userId, productId],
-        function(err) {
+        (err, row) => {
             if (err) {
-                if (err.message.includes('UNIQUE constraint failed')) {
-                    return res.status(409).json({ error: 'Товар уже в избранном' });
-                }
-                console.error('Error adding to favorites:', err);
-                return res.status(500).json({ error: 'Ошибка при добавлении в избранное' });
+                console.error('Error checking favorite:', err);
+                return res.status(500).json({ error: 'Ошибка сервера' });
             }
-            res.status(201).json({ success: true });
+            
+            if (row) {
+                // Если уже есть - возвращаем успех, а не ошибку
+                return res.json({ success: true, message: 'Товар уже в избранном' });
+            }
+            
+            // Если нет - добавляем
+            req.db.run(
+                `INSERT INTO favorites (user_id, product_id) VALUES (?, ?)`,
+                [req.user.userId, productId],
+                function(err) {
+                    if (err) {
+                        console.error('Error adding favorite:', err);
+                        return res.status(500).json({ error: 'Ошибка при добавлении' });
+                    }
+                    res.json({ success: true });
+                }
+            );
         }
     );
 });
 
-// Удалить из избранного
-router.delete('/:productId', authenticateToken, (req, res) => {
-    const productId = req.params.productId;
+router.post('/remove', authenticateToken, async (req, res) => {
+    const { productId } = req.body;
     
-    req.db.run(
-        `DELETE FROM favorites WHERE user_id = ? AND product_id = ?`,
+    // Сначала проверяем, есть ли товар в избранном
+    req.db.get(
+        `SELECT 1 FROM favorites WHERE user_id = ? AND product_id = ?`,
         [req.user.userId, productId],
-        function(err) {
+        (err, row) => {
             if (err) {
-                console.error('Error removing from favorites:', err);
-                return res.status(500).json({ error: 'Ошибка при удалении из избранного' });
+                console.error('Error checking favorite:', err);
+                return res.status(500).json({ error: 'Ошибка сервера' });
             }
-            if (this.changes === 0) {
-                return res.status(404).json({ error: 'Товар не найден в избранном' });
+            
+            if (!row) {
+                // Если нет - возвращаем успех, а не ошибку
+                return res.json({ success: true, message: 'Товара не было в избранном' });
             }
-            res.json({ success: true });
+            
+            // Если есть - удаляем
+            req.db.run(
+                `DELETE FROM favorites WHERE user_id = ? AND product_id = ?`,
+                [req.user.userId, productId],
+                function(err) {
+                    if (err) {
+                        console.error('Error removing favorite:', err);
+                        return res.status(500).json({ error: 'Ошибка при удалении' });
+                    }
+                    res.json({ success: true });
+                }
+            );
         }
     );
 });

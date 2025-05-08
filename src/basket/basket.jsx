@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import '../index.css';
 import './basket.css';
 import Header from '../header/header';
@@ -8,6 +9,7 @@ import cartImage from '../img/Иллюстрация.svg';
 import CheckoutModal from './CheckoutModal/CheckoutModal';
 
 function Basket() {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const [basket, setBasket] = useState([]);
     const [products, setProducts] = useState([]);
@@ -25,17 +27,23 @@ function Basket() {
         cardCVC: '',
     });
     const [formSuccess, setFormSuccess] = useState(false);
+    const [error, setError] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
 
-    // Загрузка корзины и продуктов
     useEffect(() => {
-        const savedBasket = JSON.parse(localStorage.getItem('basket')) || [];
-        setBasket(savedBasket);
+        const loadData = async () => {
+            try {
+                const savedBasket = JSON.parse(localStorage.getItem('basket')) || [];
+                setBasket(savedBasket);
 
-        fetch('/api/products')
-            .then(res => res.json())
-            .then(data => {
+                const response = await fetch('/api/products');
+                if (!response.ok) {
+                    throw new Error(t('basket.load_products_error'));
+                }
+                
+                const data = await response.json();
                 setProducts(data);
-                // Обновляем maxQuantity в корзине
+                
                 const updatedBasket = savedBasket.map(item => {
                     const product = data.find(p => p.name === item.title);
                     return {
@@ -43,38 +51,83 @@ function Basket() {
                         maxQuantity: product ? product.quantity : 0
                     };
                 });
+                
                 setBasket(updatedBasket);
                 localStorage.setItem('basket', JSON.stringify(updatedBasket));
-            })
-            .catch(error => console.error('Ошибка:', error));
-    }, []);
+            } catch (error) {
+                console.error(t('basket.load_error'), error);
+                setError(t('basket.load_error_message'));
+            }
+        };
+
+        loadData();
+    }, [t]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: value });
     };
 
-    const handleCheckoutSubmit = (e) => {
+    const validateForm = () => {
+        if (!formData.firstName.trim()) {
+            return t('basket.validation.first_name');
+        }
+        if (!formData.phone.trim()) {
+            return t('basket.validation.phone');
+        }
+        if (basket.length === 0) {
+            return t('basket.validation.empty_basket');
+        }
+        return null;
+    };
+
+    const handleCheckoutSubmit = async (e) => {
         e.preventDefault();
-        setFormSuccess(true);
-        setBasket([]);
-        localStorage.setItem('basket', JSON.stringify([]));
-        setFormData({
-            firstName: '',
-            lastName: '',
-            address: '',
-            email: '',
-            phone: '',
-            paymentMethod: 'card',
-            cardNumber: '',
-            cardHolder: '',
-            cardExpiry: '',
-            cardCVC: '',
-        });
-        setTimeout(() => {
-            setFormSuccess(false);
-            setIsCheckoutOpen(false);
-        }, 2500);
+        
+        const validationError = validateForm();
+        if (validationError) {
+            alert(validationError);
+            return;
+        }
+      
+        try {
+            setIsLoading(true);
+            const cleanedPhone = formData.phone.replace(/\D/g, '');
+            
+            const response = await fetch('/api/orders/checkout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    formData: {
+                        ...formData,
+                        phone: cleanedPhone
+                    },
+                    basket: basket.map(item => ({
+                        title: item.title,
+                        price: item.price,
+                        quantity: item.quantity
+                    })),
+                    totalAmount
+                }),
+            });
+        
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || t('basket.server_error'));
+            }
+        
+            setBasket([]);
+            localStorage.setItem('basket', JSON.stringify([]));
+            setFormSuccess(true);
+            
+        } catch (error) {
+            console.error(t('basket.checkout_error'), error);
+            setError(error.message);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleGoToCatalog = () => {
@@ -90,7 +143,6 @@ function Basket() {
     const updateQuantity = (productId, newQuantity) => {
         const updatedBasket = basket.map(item => {
             if (item.id === productId) {
-                // Ограничиваем количество от 1 до maxQuantity
                 const quantity = Math.max(1, Math.min(newQuantity, item.maxQuantity));
                 return { ...item, quantity };
             }
@@ -115,7 +167,6 @@ function Basket() {
         if (item) updateQuantity(productId, item.quantity - 1);
     };
 
-    // Рассчитываем общую сумму
     const totalAmount = Math.floor(
         basket.reduce((sum, item) => {
             const itemTotal = Number(item.price) * Number(item.quantity);
@@ -127,22 +178,29 @@ function Basket() {
         <div className="basket-page">
             <Header />
             <div className="cart-section container">
+                {error && (
+                    <div className="error-message">
+                        {error}
+                        <button onClick={() => setError(null)}>×</button>
+                    </div>
+                )}
+
                 {basket.length === 0 ? (
                     <div className="cart-empty-section">
                         <div className="cart-image-container">
                             <img 
                                 src={cartImage}
-                                alt="Корзина пуста" 
+                                alt={t('basket.empty_cart')} 
                                 className="cart-image"
                             />
                         </div>
-                        <h1 className="cart-title">Корзина пуста</h1>
-                        <p className="cart-subtitle">Но это никогда не поздно исправить :)</p>
+                        <h1 className="cart-title">{t('basket.empty_cart')}</h1>
+                        <p className="cart-subtitle">{t('basket.empty_message')}</p>
                         <button 
                             className="catalog-button"
                             onClick={handleGoToCatalog}
                         >
-                            В каталог товаров
+                            {t('basket.go_to_catalog')}
                         </button>
                     </div>
                 ) : (
@@ -157,7 +215,7 @@ function Basket() {
                                         <h3 className="cart-item-name">{item.title}</h3>
                                         <span className="cart-item-price">{Math.floor(item.price)}₽</span>
                                         <span className="cart-item-stock">
-                                            Доступно: {item.maxQuantity} шт. | В корзине: {item.quantity} шт.
+                                            {t('basket.available')}: {item.maxQuantity} {t('basket.pcs')} | {t('basket.in_cart')}: {item.quantity} {t('basket.pcs')}
                                         </span>
                                         <div className="cart-item-quantity">
                                             <button 
@@ -187,7 +245,7 @@ function Basket() {
                                             onClick={() => removeProduct(item.id)}
                                             className="remove-button"
                                         >
-                                            Удалить
+                                            {t('basket.remove')}
                                         </button>
                                     </div>
                                 </div>
@@ -195,20 +253,21 @@ function Basket() {
                         </div>
                         <div className="cart-summary">
                             <div className="cart-total">
-                                <span className="total-label">Общая сумма: </span>
+                                <span className="total-label">{t('basket.total')}: </span>
                                 <span className="total-amount">{totalAmount}₽</span>
                             </div>
                             <button 
                                 className="checkout-button"
                                 onClick={() => setIsCheckoutOpen(true)}
+                                disabled={basket.length === 0}
                             >
-                                Оформить заказ
+                                {t('basket.checkout')}
                             </button>
                             <button 
                                 className="catalog-button secondary"
                                 onClick={handleGoToCatalog}
                             >
-                                Вернуться в каталог
+                                {t('basket.back_to_catalog')}
                             </button>
                         </div>
                     </div>
@@ -222,6 +281,9 @@ function Basket() {
                 isCheckoutOpen={isCheckoutOpen}
                 setIsCheckoutOpen={setIsCheckoutOpen}
                 formSuccess={formSuccess}
+                error={error}
+                isLoading={isLoading}
+                t={t}
             />
 
             <Footer />

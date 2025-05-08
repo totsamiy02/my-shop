@@ -1,14 +1,16 @@
 import '../index.css';
 import './advertising_banner.css';
-// import bannerImage from '../img/banner-image.jpg'; // Добавьте свое изображение
+import { useTranslation } from 'react-i18next';
 
 function Banner() {
+    const { t } = useTranslation();
+    
     return (
         <div className="container banner">
             <div className="content">
                 <div className="text">
-                    <h1>Спортивные товары</h1>
-                    <p>Лучшее качество по доступным ценам</p>
+                    <h1>{t('banner.title')}</h1>
+                    <p>{t('banner.subtitle')}</p>
                 </div>
                 <div className="image-container">
                     <div className="image"></div>

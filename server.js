@@ -28,6 +28,9 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+
+app.set('trust proxy', 1);
+
 // Настройка Multer для загрузки файлов
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -108,7 +111,7 @@ const transporter = nodemailer.createTransport({
 // Лимитер для защиты от атак
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 минут
-    max: 6, // максимум 6 попыток
+    max: 200, // максимум 6 попыток
     message: 'Слишком много попыток входа. Пожалуйста, попробуйте позже.',
     skipSuccessfulRequests: true
 });
@@ -669,6 +672,9 @@ app.use('/api/favorites', (req, res, next) => {
     next();
 }, favoritesRoutes);
 
+const ordersRouter = require('./src/routes/orders');
+app.use('/api/orders', ordersRouter);
+
 // Статические файлы
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -686,6 +692,7 @@ app.use((err, req, res, next) => {
 // Запуск сервера
 app.listen(port, () => {
     console.log(`Сервер запущен на http://localhost:${port}`);
+    require('./telegramBot'); // Запускаем бота
     
     // Создаем необходимые папки при запуске
     const foldersToCreate = ['uploads', 'public/img'];

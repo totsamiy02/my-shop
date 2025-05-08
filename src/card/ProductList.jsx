@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import ProductCard from './ProductCard';
 import Notification from '../Notification/Notification';
 import ProductModal from '../card/modal/ProductModal';
@@ -7,6 +8,7 @@ import SearchWithFilters from '../SearchBar/SearchWithFilters';
 import '../card/ProductCard.css';
 
 function ProductList() {
+    const { t } = useTranslation();
     const [products, setProducts] = useState([]);
     const [filteredProducts, setFilteredProducts] = useState([]);
     const [showNotification, setShowNotification] = useState(false);
@@ -26,14 +28,18 @@ function ProductList() {
         goToPage,
     } = usePagination(filteredProducts, 21);
 
-    useEffect(() => {
+    const fetchProducts = () => {
         fetch('/api/products')
             .then((res) => res.json())
             .then((data) => {
                 setProducts(data);
                 setFilteredProducts(data);
             })
-            .catch((error) => console.error('Ошибка загрузки товаров:', error));
+            .catch((error) => console.error(t('product_list.load_error'), error));
+    };
+
+    useEffect(() => {
+        fetchProducts();
     }, []);
 
     useEffect(() => {
@@ -53,7 +59,7 @@ function ProductList() {
         } else if (filters.priceSort === 'desc') {
             filtered = [...filtered].sort((a, b) => b.price - a.price);
         }
-        
+
         setFilteredProducts(filtered);
         setSearchQuery(filters.query);
         goToPage(1);
@@ -65,48 +71,52 @@ function ProductList() {
 
         setBasket(prevBasket => {
             const existingProduct = prevBasket.find(item => item.title === product.title);
-            
+
             if (existingProduct) {
                 if (existingProduct.quantity >= productInDb.quantity) {
-                    alert(`Максимальное количество: ${productInDb.quantity} шт.`);
+                    alert(t('product_list.max_quantity', { quantity: productInDb.quantity }));
                     return prevBasket;
                 }
-                return prevBasket.map(item => 
-                    item.title === product.title 
-                    ? { ...item, quantity: item.quantity + 1 }
-                    : item
+                return prevBasket.map(item =>
+                    item.title === product.title
+                        ? { ...item, quantity: item.quantity + 1 }
+                        : item
                 );
             }
-            return [...prevBasket, { 
-                ...product, 
+            return [...prevBasket, {
+                ...product,
                 id: Date.now(),
                 quantity: 1
             }];
         });
 
-        // Показываем уведомление
         setShowNotification(true);
         setTimeout(() => setShowNotification(false), 3000);
+    };
+
+    const handleOrderComplete = () => {
+        setBasket([]);
+        fetchProducts();
     };
 
     return (
         <div className="product-list-container">
             <div className="product-list-header">
-                {searchQuery && <div className="search-query">Поиск: "{searchQuery}"</div>}
+                {searchQuery && <div className="search-query">{t('product_list.search_query', { query: searchQuery })}</div>}
             </div>
-            
+
             <SearchWithFilters onFiltersChange={handleFiltersChange} />
-            
+
             <div className="product-grid">
                 {filteredProducts.length === 0 ? (
                     <div className="no-products">
                         <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#FF6B00">
-                            <circle cx="12" cy="12" r="10" strokeWidth="1.5"/>
-                            <path d="M18 6L6 18" strokeWidth="1.5"/>
-                            <path d="M6 6l12 12" strokeWidth="1.5"/>
+                            <circle cx="12" cy="12" r="10" strokeWidth="1.5" />
+                            <path d="M18 6L6 18" strokeWidth="1.5" />
+                            <path d="M6 6l12 12" strokeWidth="1.5" />
                         </svg>
-                        <p>Товары не найдены</p>
-                        <button 
+                        <p>{t('product_list.no_products')}</p>
+                        <button
                             onClick={() => handleFiltersChange({
                                 query: '',
                                 minPrice: 0,
@@ -116,7 +126,7 @@ function ProductList() {
                             })}
                             className="reset-filters-button"
                         >
-                            Сбросить фильтры
+                            {t('product_list.reset_filters')}
                         </button>
                     </div>
                 ) : (
@@ -130,6 +140,7 @@ function ProductList() {
                             quantity={product.quantity}
                             handleAddToBasket={handleAddToBasket}
                             onCardClick={() => setSelectedProduct(product)}
+                            addToCartText={t('product_list.add_to_cart')}
                         />
                     ))
                 )}
@@ -137,35 +148,27 @@ function ProductList() {
 
             {filteredProducts.length > 21 && (
                 <div className="pagination-controls">
-                    <button 
-                        onClick={prevPage} 
-                        disabled={currentPage === 1}
-                        aria-label="Предыдущая страница"
-                    >
-                        Назад
+                    <button onClick={prevPage} disabled={currentPage === 1}>
+                        {t('product_list.previous')}
                     </button>
-                    <span>Страница {currentPage} из {totalPages}</span>
-                    <button 
-                        onClick={nextPage} 
-                        disabled={currentPage === totalPages}
-                        aria-label="Следующая страница"
-                    >
-                        Вперед
+                    <span>
+                        {t('product_list.page')} {currentPage} {t('product_list.of')} {totalPages}
+                    </span>
+                    <button onClick={nextPage} disabled={currentPage === totalPages}>
+                        {t('product_list.next')}
                     </button>
                 </div>
             )}
 
-            {/* Уведомление о добавлении в корзину */}
-            <Notification 
-                message="Товар добавлен в корзину" 
-                show={showNotification}
-            />
+            <Notification message={t('product_list.item_added')} show={showNotification} />
 
             {selectedProduct && (
                 <ProductModal
                     product={selectedProduct}
                     onClose={() => setSelectedProduct(null)}
-                    onAddToCart={handleAddToBasket}  // Обратите внимание на имя пропса
+                    onAddToCart={handleAddToBasket}
+                    onOrderComplete={handleOrderComplete}
+                    addToCartText={t('product_list.add_to_cart')}
                 />
             )}
         </div>

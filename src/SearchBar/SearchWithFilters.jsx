@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import './SearchWithFilters.css';
 
 function SearchWithFilters({ onFiltersChange }) {
+    const { t } = useTranslation();
     const [query, setQuery] = useState('');
     const [showHistory, setShowHistory] = useState(false);
     const [searchHistory, setSearchHistory] = useState([]);
@@ -19,8 +21,8 @@ function SearchWithFilters({ onFiltersChange }) {
         fetch('/api/categories')
             .then(res => res.json())
             .then(data => setCategories(data))
-            .catch(err => console.error('Ошибка загрузки категорий:', err));
-    }, []);
+            .catch(err => console.error(t('search_filters.load_categories_error'), err));
+    }, [t]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -123,17 +125,18 @@ function SearchWithFilters({ onFiltersChange }) {
                     <input
                         ref={inputRef}
                         type="text"
-                        placeholder="Найти товар..."
+                        placeholder={t('search_filters.search_placeholder')}
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         onFocus={() => !filtersVisible && setShowHistory(true)}
                         onBlur={() => setTimeout(() => setShowHistory(false), 200)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                     />
                     {query && (
                         <button 
                             className="clear-search-button"
                             onClick={resetSearch}
-                            aria-label="Очистить поиск"
+                            aria-label={t('search_filters.clear_search')}
                         >
                             ×
                         </button>
@@ -145,7 +148,7 @@ function SearchWithFilters({ onFiltersChange }) {
                         setFiltersVisible(!filtersVisible);
                         setShowHistory(false);
                     }}
-                    aria-label="Фильтры"
+                    aria-label={t('search_filters.filters')}
                 >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                         <path d="M4 21V14" />
@@ -158,14 +161,14 @@ function SearchWithFilters({ onFiltersChange }) {
                         <path d="M9 8h6" />
                         <path d="M17 16h6" />
                     </svg>
-                    {filtersVisible ? 'Скрыть' : 'Фильтры'}
+                    {filtersVisible ? t('search_filters.hide') : t('search_filters.filters')}
                 </button>
             </div>
 
             {filtersVisible && (
                 <div className="filters-dropdown">
                     <div className="price-filter">
-                        <label>Цена, ₽</label>
+                        <label>{t('search_filters.price_label')}</label>
                         <div className="range-inputs">
                             <input
                                 type="text"
@@ -174,7 +177,7 @@ function SearchWithFilters({ onFiltersChange }) {
                                 onBlur={() => handlePriceBlur(true)}
                                 min="0"
                                 max="10000"
-                                aria-label="Минимальная цена"
+                                aria-label={t('search_filters.min_price')}
                                 inputMode="numeric"
                                 placeholder="0"
                             />
@@ -186,15 +189,15 @@ function SearchWithFilters({ onFiltersChange }) {
                                 onBlur={() => handlePriceBlur(false)}
                                 min="0"
                                 max="10000"
-                                aria-label="Максимальная цена"
+                                aria-label={t('search_filters.max_price')}
                                 inputMode="numeric"
                                 placeholder="10000"
                             />
                             <button 
                                 className="compact-sort-button"
                                 onClick={togglePriceSort}
-                                aria-label={priceSort === 'asc' ? 'Сортировка по возрастанию' : 'Сортировка по убыванию'}
-                                title={priceSort === 'asc' ? 'По возрастанию' : 'По убыванию'}
+                                aria-label={priceSort === 'asc' ? t('search_filters.sort_asc') : t('search_filters.sort_desc')}
+                                title={priceSort === 'asc' ? t('search_filters.sort_asc') : t('search_filters.sort_desc')}
                             >
                                 {priceSort === 'asc' ? '↑' : '↓'}
                             </button>
@@ -202,13 +205,13 @@ function SearchWithFilters({ onFiltersChange }) {
                     </div>
 
                     <div className="category-filter">
-                        <label>Категория</label>
+                        <label>{t('search_filters.category_label')}</label>
                         <select
                             value={selectedCategory}
                             onChange={(e) => setSelectedCategory(e.target.value)}
-                            aria-label="Выберите категорию"
+                            aria-label={t('search_filters.select_category')}
                         >
-                            <option value="">Все категории</option>
+                            <option value="">{t('search_filters.all_categories')}</option>
                             {categories.map(cat => (
                                 <option key={cat.id} value={cat.id}>{cat.name}</option>
                             ))}
@@ -217,10 +220,10 @@ function SearchWithFilters({ onFiltersChange }) {
 
                     <div className="filter-actions">
                         <button className="reset-button" onClick={resetAllFilters}>
-                            Сбросить всё
+                            {t('search_filters.reset_all')}
                         </button>
                         <button className="apply-button" onClick={handleFilterApply}>
-                            Применить фильтры
+                            {t('search_filters.apply_filters')}
                         </button>
                     </div>
                 </div>
@@ -229,15 +232,15 @@ function SearchWithFilters({ onFiltersChange }) {
             {showHistory && !filtersVisible && searchHistory.length > 0 && (
                 <div className="search-history">
                     <div className="history-header">
-                        <span>История поиска</span>
+                        <span>{t('search_filters.search_history')}</span>
                         <button 
                             onClick={() => {
                                 localStorage.removeItem('searchHistory');
                                 setSearchHistory([]);
                             }}
-                            aria-label="Очистить историю"
+                            aria-label={t('search_filters.clear_history')}
                         >
-                            Очистить
+                            {t('search_filters.clear')}
                         </button>
                     </div>
                     {searchHistory.map((item, i) => (
