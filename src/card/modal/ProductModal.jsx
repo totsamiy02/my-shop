@@ -53,35 +53,39 @@ function ProductModal({ product, onClose, onAddToCart, onOrderComplete }) {
     };
 
     const toggleFavorite = async (e) => {
-        e.stopPropagation();
+    e.stopPropagation();
 
-        if (!user) {
-            alert('Для добавления в избранное необходимо войти в систему');
-            return;
-        }
+    if (!user) {
+        alert('Для добавления в избранное необходимо войти в систему');
+        return;
+    }
 
-        try {
-            if (isFavorite) {
-                await fetch(`/api/favorites/${product.id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
-            } else {
-                await fetch(`/api/favorites/${product.id}`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
-            }
-            setIsFavorite(!isFavorite);
-            window.dispatchEvent(new Event('favoritesUpdated'));
-        } catch (error) {
-            console.error('Error toggling favorite:', error);
+    try {
+        if (isFavorite) {
+            await fetch(`/api/favorites/remove`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ productId: product.id })
+            });
+        } else {
+            await fetch(`/api/favorites/add`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ productId: product.id })
+            });
         }
-    };
+        setIsFavorite(!isFavorite);
+        window.dispatchEvent(new Event('favoritesUpdated'));
+    } catch (error) {
+        console.error('Error toggling favorite:', error);
+    }
+};
 
     const handleAddToCart = async (e) => {
         e.stopPropagation();

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 
 const FavoritesContext = createContext();
@@ -8,7 +8,7 @@ export function FavoritesProvider({ children }) {
   const [count, setCount] = useState(0);
   const { isAuthenticated } = useAuth();
 
-  const fetchFavorites = async () => {
+  const fetchFavorites = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -35,7 +35,7 @@ export function FavoritesProvider({ children }) {
       setFavorites([]);
       setCount(0);
     }
-  };
+  }, []);
 
   const addFavorite = async (productId) => {
     try {
@@ -92,6 +92,8 @@ export function FavoritesProvider({ children }) {
   };
 
   useEffect(() => {
+    let isMounted = true;
+
     if (isAuthenticated) {
       fetchFavorites();
     } else {
@@ -99,13 +101,19 @@ export function FavoritesProvider({ children }) {
       setCount(0);
     }
 
-    const handleUpdate = () => fetchFavorites();
+    const handleUpdate = () => {
+      if (isMounted && isAuthenticated) {
+        fetchFavorites();
+      }
+    };
+
     window.addEventListener('favoritesUpdated', handleUpdate);
     
     return () => {
+      isMounted = false;
       window.removeEventListener('favoritesUpdated', handleUpdate);
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, fetchFavorites]);
 
   return (
     <FavoritesContext.Provider value={{ 

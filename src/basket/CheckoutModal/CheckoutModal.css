@@ -1,22 +1,19 @@
-/* CheckoutModal.css */
+/* CheckoutModal.css - Полная версия с исправлениями */
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
+    right: 0;
+    bottom: 0;
     background: rgba(0, 0, 0, 0.5);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 1000;
     backdrop-filter: blur(5px);
-    animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 20px 10px;
 }
 
 .modal-window {
@@ -25,11 +22,14 @@
     padding: 40px;
     border-radius: 20px;
     max-width: 500px;
-    width: 90%;
+    width: calc(100% - 20px);
+    max-height: 90vh;
+    overflow: hidden;
     position: relative;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    margin: auto;
+    box-sizing: border-box;
     animation: slideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-    overflow: hidden;
 }
 
 @keyframes slideUp {
@@ -37,20 +37,68 @@
     to { transform: translateY(0); opacity: 1; }
 }
 
+/* Исправленная кнопка закрытия */
 .modal-close {
     position: absolute;
-    top: 20px;
-    right: 20px;
-    background: transparent;
+    top: 15px;
+    right: 15px;
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.9);
     border: none;
-    font-size: 28px;
+    border-radius: 50%;
+    font-size: 22px;
     color: #FF6B00;
     cursor: pointer;
-    transition: transform 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    padding: 0;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    line-height: 1;
 }
 
 .modal-close:hover {
-    transform: scale(1.2);
+    background: #FF6B00;
+    color: white;
+    transform: scale(1.1);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Область с прокруткой */
+.form-scrollable {
+    max-height: calc(90vh - 200px);
+    overflow-y: auto;
+    padding-right: 15px;
+    margin-right: -15px;
+    scrollbar-width: thin;
+    scrollbar-color: #FF6B00 #f1f1f1;
+}
+
+/* Кастомный скроллбар */
+.form-scrollable::-webkit-scrollbar {
+    width: 8px;
+}
+
+.form-scrollable::-webkit-scrollbar-thumb {
+    background: #FF6B00;
+    border-radius: 4px;
+}
+
+.form-scrollable::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+    margin: 5px 0;
+}
+
+/* Для Firefox */
+@supports (scrollbar-color: red blue) {
+    .form-scrollable {
+        scrollbar-color: #FF6B00 #f1f1f1;
+        scrollbar-width: thin;
+    }
 }
 
 .modal-title {
@@ -71,6 +119,7 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
+    margin-bottom: 15px;
 }
 
 .checkout-form input {
@@ -80,6 +129,8 @@
     font-size: 16px;
     transition: all 0.3s ease;
     background-color: #f9f9f9;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .checkout-form input:focus {
@@ -173,6 +224,11 @@ input[type="radio"] {
     box-sizing: border-box;
 }
 
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
 .card-title {
     font-size: 18px;
     font-weight: 600;
@@ -188,11 +244,11 @@ input[type="radio"] {
 
 .card-row .form-group {
     flex: 1;
-    min-width: 0; /* Важное правило для корректного сжатия */
+    min-width: 0;
 }
 
 .card-row .form-group:last-child {
-    flex: 0 0 100px; /* Фиксированная ширина для CVC */
+    flex: 0 0 100px;
 }
 
 .card-row input {
@@ -210,7 +266,8 @@ input[type="radio"] {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s;
-    margin-top: 20px;
+    margin-top: 10px;
+    width: 100%;
 }
 
 .checkout-button:hover {
@@ -226,7 +283,6 @@ input[type="radio"] {
     box-shadow: none;
 }
 
-/* Success message styles */
 .success-container {
     display: flex;
     flex-direction: column;
@@ -286,7 +342,6 @@ input[type="radio"] {
     transform: translateY(-2px);
 }
 
-/* Tooltip styles */
 [data-tooltip] {
     position: relative;
 }
@@ -307,19 +362,90 @@ input[type="radio"] {
     margin-bottom: 5px;
 }
 
-/* Responsive styles */
-@media (max-width: 480px) {
+/* Адаптация для мобильных */
+@media (max-width: 768px) {
+    .modal-window {
+        padding: 30px 20px;
+        max-height: 85vh;
+    }
+    
+    .modal-close {
+        top: 12px;
+        right: 12px;
+        width: 30px;
+        height: 30px;
+        font-size: 20px;
+    }
+    
+    .modal-title {
+        font-size: 22px;
+        margin-bottom: 20px;
+    }
+    
+    .form-scrollable {
+        max-height: calc(85vh - 170px);
+    }
+    
+    .checkout-form input {
+        padding: 12px;
+    }
+    
     .card-row {
-        flex-direction: row; /* Оставляем в строке даже на мобильных */
+        flex-direction: column;
         gap: 10px;
     }
     
     .card-row .form-group:last-child {
-        flex: 0 0 80px; /* Уменьшаем CVC поле на мобильных */
+        flex: 1;
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .modal-overlay {
+        padding: 15px 5px;
     }
     
-    .card-row input[placeholder="MM/YY"] {
-        flex: 1;
-        min-width: 100px;
+    .modal-window {
+        padding: 25px 15px;
+        max-height: 90vh;
+    }
+    
+    .modal-close {
+        top: 10px;
+        right: 10px;
+        width: 28px;
+        height: 28px;
+        font-size: 18px;
+    }
+    
+    .form-scrollable {
+        max-height: calc(90vh - 150px);
+        padding-right: 10px;
+        margin-right: -10px;
+    }
+    
+    .modal-title {
+        font-size: 20px;
+        margin-bottom: 18px;
+    }
+    
+    .checkout-form {
+        gap: 15px;
+    }
+    
+    .payment-method,
+    .card-details {
+        padding: 12px;
+    }
+    
+    .success-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 24px;
+    }
+    
+    .success-message {
+        font-size: 20px;
     }
 }

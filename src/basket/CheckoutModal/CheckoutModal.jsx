@@ -82,6 +82,7 @@ const CheckoutModal = ({ formData, handleInputChange, handleCheckoutSubmit, isCh
                             </button>
                         </div>
                     ) : (
+                    <div className="form-scrollable">
                         <form onSubmit={handleCheckoutSubmit} className="checkout-form">
                             <div className="form-group">
                                 <input
@@ -260,6 +261,7 @@ const CheckoutModal = ({ formData, handleInputChange, handleCheckoutSubmit, isCh
                                     </div>
                                 </div>
                             </div>
+                        
                         )}
 
                             <button 
@@ -270,6 +272,7 @@ const CheckoutModal = ({ formData, handleInputChange, handleCheckoutSubmit, isCh
                                 Подтвердить заказ
                             </button>
                         </form>
+                    </div>
                     )}
                 </div>
             </div>

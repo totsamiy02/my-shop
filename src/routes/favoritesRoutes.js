@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 
+// Кеш для избранного
+const favoritesCache = new Map();
+
 // Middleware для проверки JWT
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
@@ -33,11 +36,10 @@ router.get('/check/:productId', authenticateToken, (req, res) => {
     );
 });
 
-// Добавляем проверку перед действиями
+// Добавить в избранное
 router.post('/add', authenticateToken, async (req, res) => {
     const { productId } = req.body;
     
-    // Сначала проверяем, есть ли уже товар в избранном
     req.db.get(
         `SELECT 1 FROM favorites WHERE user_id = ? AND product_id = ?`,
         [req.user.userId, productId],
@@ -48,11 +50,9 @@ router.post('/add', authenticateToken, async (req, res) => {
             }
             
             if (row) {
-                // Если уже есть - возвращаем успех, а не ошибку
                 return res.json({ success: true, message: 'Товар уже в избранном' });
             }
             
-            // Если нет - добавляем
             req.db.run(
                 `INSERT INTO favorites (user_id, product_id) VALUES (?, ?)`,
                 [req.user.userId, productId],
@@ -61,6 +61,9 @@ router.post('/add', authenticateToken, async (req, res) => {
                         console.error('Error adding favorite:', err);
                         return res.status(500).json({ error: 'Ошибка при добавлении' });
                     }
+                    
+                    // Очищаем кеш для этого пользователя
+                    favoritesCache.delete(`favorites_${req.user.userId}`);
                     res.json({ success: true });
                 }
             );
@@ -68,10 +71,10 @@ router.post('/add', authenticateToken, async (req, res) => {
     );
 });
 
+// Удалить из избранного
 router.post('/remove', authenticateToken, async (req, res) => {
     const { productId } = req.body;
     
-    // Сначала проверяем, есть ли товар в избранном
     req.db.get(
         `SELECT 1 FROM favorites WHERE user_id = ? AND product_id = ?`,
         [req.user.userId, productId],
@@ -82,11 +85,9 @@ router.post('/remove', authenticateToken, async (req, res) => {
             }
             
             if (!row) {
-                // Если нет - возвращаем успех, а не ошибку
                 return res.json({ success: true, message: 'Товара не было в избранном' });
             }
             
-            // Если есть - удаляем
             req.db.run(
                 `DELETE FROM favorites WHERE user_id = ? AND product_id = ?`,
                 [req.user.userId, productId],
@@ -95,6 +96,9 @@ router.post('/remove', authenticateToken, async (req, res) => {
                         console.error('Error removing favorite:', err);
                         return res.status(500).json({ error: 'Ошибка при удалении' });
                     }
+                    
+                    // Очищаем кеш для этого пользователя
+                    favoritesCache.delete(`favorites_${req.user.userId}`);
                     res.json({ success: true });
                 }
             );
@@ -104,6 +108,13 @@ router.post('/remove', authenticateToken, async (req, res) => {
 
 // Получить все избранное пользователя
 router.get('/', authenticateToken, (req, res) => {
+    const cacheKey = `favorites_${req.user.userId}`;
+    const cached = favoritesCache.get(cacheKey);
+    
+    if (cached) {
+        return res.json(cached);
+    }
+
     req.db.all(
         `SELECT p.* FROM favorites f
          JOIN products p ON f.product_id = p.id
@@ -114,7 +125,12 @@ router.get('/', authenticateToken, (req, res) => {
                 console.error('Error fetching favorites:', err);
                 return res.status(500).json({ error: 'Ошибка при получении избранного' });
             }
-            res.json(favorites);
+            
+            const result = Array.isArray(favorites) ? favorites : [];
+            favoritesCache.set(cacheKey, result);
+            setTimeout(() => favoritesCache.delete(cacheKey), 10000); // Очистка кеша через 10 сек
+            
+            res.json(result);
         }
     );
 });

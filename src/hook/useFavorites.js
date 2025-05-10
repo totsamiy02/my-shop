@@ -4,10 +4,12 @@ export function useFavorites() {
     const [count, setCount] = useState(0);
 
     useEffect(() => {
+        let isMounted = true;
+
         const fetchCount = async () => {
             const token = localStorage.getItem('token');
             if (!token) {
-                setCount(0);
+                if (isMounted) setCount(0);
                 return;
             }
 
@@ -16,12 +18,12 @@ export function useFavorites() {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 
-                if (response.ok) {
+                if (response.ok && isMounted) {
                     const data = await response.json();
                     setCount(Array.isArray(data) ? data.length : 0);
                 }
             } catch (error) {
-                setCount(0);
+                if (isMounted) setCount(0);
             }
         };
 
@@ -29,7 +31,11 @@ export function useFavorites() {
 
         const handleUpdate = () => fetchCount();
         window.addEventListener('favoritesForceUpdate', handleUpdate);
-        return () => window.removeEventListener('favoritesForceUpdate', handleUpdate);
+        
+        return () => {
+            isMounted = false;
+            window.removeEventListener('favoritesForceUpdate', handleUpdate);
+        };
     }, []);
 
     return count;

@@ -20,24 +20,33 @@ function FavoritesPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let isMounted = true;
+
     const handleAuthChange = () => {
-      if (isAuthenticated) {
-        fetchFavorites().finally(() => setIsLoading(false));
-      } else {
+      if (isAuthenticated && isMounted) {
+        fetchFavorites().finally(() => {
+          if (isMounted) setIsLoading(false);
+        });
+      } else if (isMounted) {
         setIsLoading(false);
       }
     };
 
     handleAuthChange();
 
+    const handleFavoritesUpdated = () => {
+      if (isMounted && isAuthenticated) {
+        fetchFavorites();
+      }
+    };
+
     window.addEventListener('authStateChanged', handleAuthChange);
-    window.addEventListener('favoritesUpdated', () => {
-      fetchFavorites().finally(() => setIsLoading(false));
-    });
+    window.addEventListener('favoritesUpdated', handleFavoritesUpdated);
     
     return () => {
+      isMounted = false;
       window.removeEventListener('authStateChanged', handleAuthChange);
-      window.removeEventListener('favoritesUpdated', fetchFavorites);
+      window.removeEventListener('favoritesUpdated', handleFavoritesUpdated);
     };
   }, [isAuthenticated, fetchFavorites]);
 
