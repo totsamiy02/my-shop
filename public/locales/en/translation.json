@@ -19,19 +19,26 @@
       }
     },
     "banner": {
-    "title": "Sports goods",
-    "subtitle": "Best quality at affordable prices"
+    "slide1": {
+      "title": "Premium Sports Nutrition",
+      "subtitle": "Proteins, gainers and amino acids for progress"
     },
-    "product_list": {
-    "filters": "Filters",
-    "sort_by": "Sort by",
-    "price_low_to_high": "Price: Low to High",
-    "price_high_to_low": "Price: High to Low",
-    "add_to_cart": "Add to cart",
-    "previous": "Previous",
-    "next": "Next",
-    "page": "Page",
-    "of": "of"
+    "slide2": {
+      "title": "Weightlifting Belts",
+      "subtitle": "Professional back support for heavy lifts"
+    },
+    "slide3": {
+      "title": "Yoga Mats",
+      "subtitle": "Non-slip surfaces with shape memory"
+    },
+    "slide4": {
+      "title": "Training Gloves",
+      "subtitle": "Callus protection with enhanced grip"
+    },
+    "slide5": {
+      "title": "Fitness Accessories",
+      "subtitle": "Straps, wraps and rollers for full comfort"
+    }
     },
     "search_filters": {
         "load_categories_error": "Error loading categories:",

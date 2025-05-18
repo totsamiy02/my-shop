@@ -27,43 +27,50 @@ function ProfilePage() {
     const [pendingAction, setPendingAction] = useState(null);
     const navigate = useNavigate();
 
-    useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            navigate('/');
-            return;
-        }
-
+        useEffect(() => {
         const fetchUserData = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                navigate('/login');
+                return;
+            }
+
             try {
                 const response = await fetch('/api/user', {
                     headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
                 });
-                
-                if (response.ok) {
-                    const userData = await response.json();
-                    setUser(userData);
-                    setFormData({
-                        firstName: userData.first_name,
-                        lastName: userData.last_name,
-                        phone: userData.phone
-                    });
-                } else {
+
+                if (response.status === 403) {
                     localStorage.removeItem('token');
-                    navigate('/');
+                    navigate('/login');
+                    return;
                 }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const userData = await response.json();
+                setUser(userData);
+                setFormData({
+                    firstName: userData.first_name || '',
+                    lastName: userData.last_name || '',
+                    phone: userData.phone || ''
+                });
             } catch (error) {
-                console.error('Ошибка при получении данных пользователя:', error);
-                toast.error('Ошибка при загрузке данных профиля');
+                console.error('Fetch error:', error);
+                toast.error('Не удалось загрузить профиль');
+                navigate('/login');
             } finally {
-                setLoading(false);
+                setLoading(false); // Гарантированно снимаем индикатор загрузки
             }
         };
 
         fetchUserData();
-    }, [navigate]);
+    }, [navigate]); // Только navigate в зависимостях
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;

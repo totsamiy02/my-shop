@@ -10,10 +10,16 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
         password: '',
         confirmPassword: ''
     });
+    const [resetData, setResetData] = useState({
+        code: '',
+        newPassword: '',
+        confirmPassword: ''
+    });
     const [errors, setErrors] = useState({});
     const [message, setMessage] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [resetPasswordMode, setResetPasswordMode] = useState(false);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -41,6 +47,14 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
         });
     };
 
+    const handleResetChange = (e) => {
+        const { name, value } = e.target;
+        setResetData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
     const validate = () => {
         const newErrors = {};
         
@@ -60,7 +74,10 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
             newErrors.password = 'Пароль должен содержать минимум 8 символов';
         }
         
-        if (mode === 'register' && formData.password !== formData.confirmPassword) {
+        if ((mode === 'register' || resetPasswordMode) && 
+            (resetPasswordMode 
+                ? resetData.newPassword !== resetData.confirmPassword 
+                : formData.password !== formData.confirmPassword)) {
             newErrors.confirmPassword = 'Пароли не совпадают';
         }
         
@@ -70,6 +87,12 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        if (resetPasswordMode) {
+            await handleResetPassword();
+            return;
+        }
+        
         if (!validate()) return;
         
         setIsLoading(true);
@@ -107,7 +130,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
             
             if (mode === 'login') {
                 onLoginSuccess(data.token, data.user);
-                setTimeout(() => onClose(), 500); // Закрываем с задержкой
+                setTimeout(() => onClose(), 500);
             } else {
                 setMessage('Регистрация прошла успешно! Теперь вы можете войти.');
                 onModeChange('login');
@@ -145,16 +168,77 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
             const data = await response.json();
             
             if (!response.ok) {
-                throw new Error(data.error || 'Произошла ошибка');
+                throw new Error(data.error || 'Ошибка сервера');
             }
             
-            setMessage(data.message);
-            onModeChange('login');
+            setMessage(data.message || 'Код подтверждения отправлен на ваш email');
+            setResetPasswordMode(true);
         } catch (error) {
             setMessage(error.message);
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleResetPassword = async (e) => {
+        e.preventDefault();
+        
+        if (!validate()) {
+            return;
+        }
+        
+        if (!resetData.code) {
+            setMessage('Введите код подтверждения');
+            return;
+        }
+        
+        setIsLoading(true);
+        setMessage('');
+        
+        try {
+            const response = await fetch('/api/reset-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    token: resetData.code,
+                    newPassword: resetData.newPassword
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Ошибка сброса пароля');
+            }
+            
+            setMessage('Пароль успешно изменен! Теперь вы можете войти.');
+            setTimeout(() => {
+                setResetPasswordMode(false);
+                setResetData({
+                    code: '',
+                    newPassword: '',
+                    confirmPassword: ''
+                });
+            }, 2000);
+        } catch (error) {
+            console.error('Reset error:', error);
+            setMessage(error.message || 'Ошибка при сбросе пароля');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleCancelReset = () => {
+        setResetPasswordMode(false);
+        setMessage('');
+        setErrors({});
+        setResetData({
+            code: '',
+            newPassword: '',
+            confirmPassword: ''
+        });
     };
 
     if (!isOpen) return null;
@@ -164,129 +248,193 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
             <div className="auth-modal">
                 <button className="close-button" onClick={onClose}>×</button>
                 
-                <h2>{mode === 'login' ? 'Вход' : 'Регистрация'}</h2>
+                <h2>
+                    {resetPasswordMode 
+                        ? 'Сброс пароля' 
+                        : mode === 'login' 
+                            ? 'Вход' 
+                            : 'Регистрация'}
+                </h2>
                 
                 {message && (
-                    <div className={`message ${message.includes('успеш') ? 'success' : 'error'}`}>
+                    <div className={`message ${message.includes('успеш') || message.includes('изменен') ? 'success' : 'error'}`}>
                         {message}
                     </div>
                 )}
                 
-                <form onSubmit={handleSubmit}>
-                    {mode === 'register' && (
+                <form onSubmit={resetPasswordMode ? handleResetPassword : handleSubmit}>
+                    {resetPasswordMode ? (
                         <>
                             <div className="form-group">
-                                <label htmlFor="firstName">Имя</label>
+                                <label>Код подтверждения</label>
                                 <input
                                     type="text"
-                                    id="firstName"
-                                    name="firstName"
-                                    value={formData.firstName}
-                                    onChange={handleChange}
-                                    placeholder="Введите ваше имя"
-                                    className={errors.firstName ? 'error' : ''}
+                                    name="code"
+                                    value={resetData.code}
+                                    onChange={handleResetChange}
+                                    placeholder="Введите код из письма"
                                 />
-                                {errors.firstName && <span className="error-text">{errors.firstName}</span>}
                             </div>
                             
                             <div className="form-group">
-                                <label htmlFor="lastName">Фамилия</label>
-                                <input
-                                    type="text"
-                                    id="lastName"
-                                    name="lastName"
-                                    value={formData.lastName}
-                                    onChange={handleChange}
-                                    placeholder="Введите вашу фамилию"
-                                    className={errors.lastName ? 'error' : ''}
-                                />
-                                {errors.lastName && <span className="error-text">{errors.lastName}</span>}
+                                <label>Новый пароль</label>
+                                <div className="password-input">
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        name="newPassword"
+                                        value={resetData.newPassword}
+                                        onChange={handleResetChange}
+                                        placeholder="Введите новый пароль"
+                                    />
+                                    <button 
+                                        type="button" 
+                                        className="show-password"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                    >
+                                        {showPassword ? '🙈' : '👁️'}
+                                    </button>
+                                </div>
                             </div>
                             
                             <div className="form-group">
-                                <label htmlFor="phone">Номер телефона</label>
+                                <label>Подтверждение пароля</label>
                                 <input
-                                    type="text"
-                                    id="phone"
-                                    name="phone"
-                                    value={formData.phone}
-                                    onChange={handleChange}
-                                    placeholder="+7 (XXX) - XXX - XX - XX"
-                                    className={errors.phone ? 'error' : ''}
+                                    type={showPassword ? "text" : "password"}
+                                    name="confirmPassword"
+                                    value={resetData.confirmPassword}
+                                    onChange={handleResetChange}
+                                    placeholder="Повторите новый пароль"
                                 />
-                                {errors.phone && <span className="error-text">{errors.phone}</span>}
+                                {errors.confirmPassword && <span className="error-text">{errors.confirmPassword}</span>}
                             </div>
-                        </>
-                    )}
-                    
-                    <div className="form-group">
-                        <label htmlFor="email">Email</label>
-                        <input
-                            type="email"
-                            id="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            placeholder="Введите ваш email"
-                            className={errors.email ? 'error' : ''}
-                        />
-                        {errors.email && <span className="error-text">{errors.email}</span>}
-                    </div>
-                    
-                    <div className="form-group">
-                        <label htmlFor="password">Пароль</label>
-                        <div className="password-input">
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                id="password"
-                                name="password"
-                                value={formData.password}
-                                onChange={handleChange}
-                                placeholder="Введите пароль"
-                                className={errors.password ? 'error' : ''}
-                            />
+                            
+                            <button type="submit" className="submit-button" disabled={isLoading}>
+                                {isLoading ? 'Сохранение...' : 'Сменить пароль'}
+                            </button>
+                            
                             <button 
                                 type="button" 
-                                className="show-password"
-                                onClick={() => setShowPassword(!showPassword)}
+                                className="cancel-button" 
+                                onClick={handleCancelReset}
+                                disabled={isLoading}
                             >
-                                {showPassword ? '🙈' : '👁️'}
+                                Отмена
                             </button>
-                        </div>
-                        {errors.password && <span className="error-text">{errors.password}</span>}
-                    </div>
-                    
-                    {mode === 'register' && (
-                        <div className="form-group">
-                            <label htmlFor="confirmPassword">Подтверждение пароля</label>
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                id="confirmPassword"
-                                name="confirmPassword"
-                                value={formData.confirmPassword}
-                                onChange={handleChange}
-                                placeholder="Повторите пароль"
-                                className={errors.confirmPassword ? 'error' : ''}
-                            />
-                            {errors.confirmPassword && <span className="error-text">{errors.confirmPassword}</span>}
-                        </div>
-                    )}
-                    
-                    <button type="submit" className="submit-button" disabled={isLoading}>
-                        {isLoading ? 'Загрузка...' : mode === 'login' ? 'Войти' : 'Зарегистрироваться'}
-                    </button>
-                </form>
-                
-                <div className="auth-switch">
-                    {mode === 'login' ? (
-                        <>
-                            <p>Нет аккаунта? <button onClick={() => onModeChange('register')}>Зарегистрироваться</button></p>
-                            <p>Забыли пароль? <button onClick={handleForgotPassword}>Восстановить</button></p>
                         </>
                     ) : (
-                        <p>Уже есть аккаунт? <button onClick={() => onModeChange('login')}>Войти</button></p>
+                        <>
+                            {mode === 'register' && (
+                                <>
+                                    <div className="form-group">
+                                        <label>Имя</label>
+                                        <input
+                                            type="text"
+                                            name="firstName"
+                                            value={formData.firstName}
+                                            onChange={handleChange}
+                                            placeholder="Введите ваше имя"
+                                            className={errors.firstName ? 'error' : ''}
+                                        />
+                                        {errors.firstName && <span className="error-text">{errors.firstName}</span>}
+                                    </div>
+                                    
+                                    <div className="form-group">
+                                        <label>Фамилия</label>
+                                        <input
+                                            type="text"
+                                            name="lastName"
+                                            value={formData.lastName}
+                                            onChange={handleChange}
+                                            placeholder="Введите вашу фамилию"
+                                            className={errors.lastName ? 'error' : ''}
+                                        />
+                                        {errors.lastName && <span className="error-text">{errors.lastName}</span>}
+                                    </div>
+                                    
+                                    <div className="form-group">
+                                        <label>Номер телефона</label>
+                                        <input
+                                            type="text"
+                                            name="phone"
+                                            value={formData.phone}
+                                            onChange={handleChange}
+                                            placeholder="+7 (XXX) - XXX - XX - XX"
+                                            className={errors.phone ? 'error' : ''}
+                                        />
+                                        {errors.phone && <span className="error-text">{errors.phone}</span>}
+                                    </div>
+                                </>
+                            )}
+                            
+                            <div className="form-group">
+                                <label>Email</label>
+                                <input
+                                    type="email"
+                                    name="email"
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    placeholder="Введите ваш email"
+                                    className={errors.email ? 'error' : ''}
+                                />
+                                {errors.email && <span className="error-text">{errors.email}</span>}
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Пароль</label>
+                                <div className="password-input">
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        name="password"
+                                        value={formData.password}
+                                        onChange={handleChange}
+                                        placeholder="Введите пароль"
+                                        className={errors.password ? 'error' : ''}
+                                    />
+                                    <button 
+                                        type="button" 
+                                        className="show-password"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                    >
+                                        {showPassword ? '🙈' : '👁️'}
+                                    </button>
+                                </div>
+                                {errors.password && <span className="error-text">{errors.password}</span>}
+                            </div>
+                            
+                            {mode === 'register' && (
+                                <div className="form-group">
+                                    <label>Подтверждение пароля</label>
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        name="confirmPassword"
+                                        value={formData.confirmPassword}
+                                        onChange={handleChange}
+                                        placeholder="Повторите пароль"
+                                        className={errors.confirmPassword ? 'error' : ''}
+                                    />
+                                    {errors.confirmPassword && <span className="error-text">{errors.confirmPassword}</span>}
+                                </div>
+                            )}
+                            
+                            <button type="submit" className="submit-button" disabled={isLoading}>
+                                {isLoading ? 'Загрузка...' : mode === 'login' ? 'Войти' : 'Зарегистрироваться'}
+                            </button>
+                        </>
                     )}
-                </div>
+                </form>
+                
+                {!resetPasswordMode && (
+                    <div className="auth-switch">
+                        {mode === 'login' ? (
+                            <>
+                                <p>Нет аккаунта? <button onClick={() => onModeChange('register')}>Зарегистрироваться</button></p>
+                                <p>Забыли пароль? <button onClick={handleForgotPassword}>Восстановить</button></p>
+                            </>
+                        ) : (
+                            <p>Уже есть аккаунт? <button onClick={() => onModeChange('login')}>Войти</button></p>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

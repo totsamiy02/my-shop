@@ -33,19 +33,34 @@ app.set('trust proxy', 1);
 
 // Настройка Multer для загрузки файлов
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadPath = path.join(__dirname, 'uploads');
-        if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath, { recursive: true });
-        }
-        cb(null, uploadPath);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, 'temp_uploads');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
     }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'avatar-' + uniqueSuffix + path.extname(file.originalname));
+  }
 });
-const upload = multer({ storage });
+
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+    files: 1
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Недопустимый тип файла. Разрешены только JPEG, PNG и GIF'));
+    }
+  }
+});
 
 // Инициализация базы данных
 const db = new sqlite3.Database('./store.db', (err) => {
@@ -65,7 +80,7 @@ const db = new sqlite3.Database('./store.db', (err) => {
                     email TEXT NOT NULL UNIQUE,
                     password TEXT NOT NULL,
                     role TEXT DEFAULT 'user',
-                    avatar TEXT DEFAULT '/img/default-avatar.jpg',
+                    avatar TEXT DEFAULT '/img/avatar.jpg',
                     reset_token TEXT,
                     reset_token_expires INTEGER,
                     failed_login_attempts INTEGER DEFAULT 0,
@@ -99,19 +114,11 @@ const db = new sqlite3.Database('./store.db', (err) => {
     }
 });
 
-// Настройка почтового транспорта
-const transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
 
 // Лимитер для защиты от атак
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 минут
-    max: 200, // максимум 6 попыток
+    max: 200, 
     message: 'Слишком много попыток входа. Пожалуйста, попробуйте позже.',
     skipSuccessfulRequests: true
 });
@@ -266,60 +273,138 @@ app.post('/api/login', authLimiter, async (req, res) => {
     }
 });
 
-app.post('/api/forgot-password', (req, res) => {
-    const { email } = req.body;
-    
+// востановление паролей
+
+const transporter = nodemailer.createTransport({
+  host: 'smtp.yandex.ru',
+  port: 465,
+  secure: true,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
+
+// Эндпоинт для отправки кода восстановления
+app.post('/api/forgot-password', async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    // Проверяем существование пользователя
     db.get(
-        `SELECT * FROM users WHERE email = ?`,
-        [email],
-        (err, user) => {
-            if (err) {
-                return res.status(500).json({ error: 'Ошибка сервера' });
-            }
-            
-            if (!user) {
-                return res.status(404).json({ error: 'Пользователь с таким email не найден' });
-            }
-            
-            const resetToken = crypto.randomBytes(20).toString('hex');
-            const resetTokenExpires = Date.now() + 3600000;
-            
-            db.run(
-                `UPDATE users SET 
-                reset_token = ?,
-                reset_token_expires = ?
-                WHERE id = ?`,
-                [resetToken, resetTokenExpires, user.id],
-                (err) => {
-                    if (err) {
-                        return res.status(500).json({ error: 'Ошибка сервера' });
-                    }
-                    
-                    const mailOptions = {
-                        from: process.env.EMAIL_USER,
-                        to: user.email,
-                        subject: 'Восстановление пароля',
-                        html: `
-                            <h2>Восстановление пароля</h2>
-                            <p>Вы запросили сброс пароля для аккаунта ${user.email}.</p>
-                            <p>Ваш код для сброса пароля: <strong>${resetToken}</strong></p>
-                            <p>Код действителен в течение 1 часа.</p>
-                            <p>Если вы не запрашивали сброс пароля, проигнорируйте это письмо.</p>
-                        `
-                    };
-                    
-                    transporter.sendMail(mailOptions, (error, info) => {
-                        if (error) {
-                            console.error('Ошибка отправки письма:', error);
-                            return res.status(500).json({ error: 'Ошибка отправки письма' });
-                        }
-                        
-                        res.json({ message: 'Письмо с инструкциями отправлено на ваш email' });
-                    });
-                }
-            );
+      `SELECT * FROM users WHERE email = ?`, 
+      [email],
+      async (err, user) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Ошибка базы данных' });
         }
+
+        if (!user) {
+          return res.status(400).json({ error: 'Пользователь с таким email не найден' });
+        }
+
+        // Генерируем токен
+        const resetToken = crypto.randomBytes(20).toString('hex');
+        const resetTokenExpires = Date.now() + 3600000; // 1 час
+
+        // Сохраняем токен в БД
+        db.run(
+          `UPDATE users SET 
+           reset_token = ?,
+           reset_token_expires = ?
+           WHERE id = ?`,
+          [resetToken, resetTokenExpires, user.id],
+          async (err) => {
+            if (err) {
+              console.error('Database update error:', err);
+              return res.status(500).json({ error: 'Ошибка при обновлении данных' });
+            }
+
+            // Отправляем письмо
+            const mailOptions = {
+              from: `"Поддержка магазина" <${process.env.EMAIL_USER}>`,
+              to: email,
+              subject: 'Восстановление пароля',
+              html: `
+                <h2>Восстановление пароля</h2>
+                <p>Для сброса пароля используйте следующий код:</p>
+                <h3 style="font-size: 24px; letter-spacing: 2px;">${resetToken}</h3>
+                <p>Код действителен в течение 1 часа.</p>
+                <p>Если вы не запрашивали сброс пароля, проигнорируйте это письмо.</p>
+              `
+            };
+
+            try {
+              await transporter.sendMail(mailOptions);
+              res.json({ 
+                success: true,
+                message: 'Код восстановления отправлен на ваш email' 
+              });
+            } catch (mailError) {
+              console.error('Mail sending error:', mailError);
+              res.status(500).json({ error: 'Ошибка при отправке письма' });
+            }
+          }
+        );
+      }
     );
+  } catch (error) {
+    console.error('Server error:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+// Эндпоинт для сброса пароля
+app.post('/api/reset-password', async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  try {
+    // Проверяем токен и срок его действия
+    db.get(
+      `SELECT * FROM users 
+       WHERE reset_token = ? 
+       AND reset_token_expires > ?`,
+      [token, Date.now()],
+      async (err, user) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+
+        if (!user) {
+          return res.status(400).json({ error: 'Неверный или просроченный код подтверждения' });
+        }
+
+        // Хешируем новый пароль
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        // Обновляем пароль и очищаем токен
+        db.run(
+          `UPDATE users SET 
+           password = ?,
+           reset_token = NULL,
+           reset_token_expires = NULL
+           WHERE id = ?`,
+          [hashedPassword, user.id],
+          function(err) {
+            if (err) {
+              console.error('Database update error:', err);
+              return res.status(500).json({ error: 'Ошибка при обновлении пароля' });
+            }
+            
+            res.json({ 
+              success: true,
+              message: 'Пароль успешно изменен' 
+            });
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('Server error:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
 });
 
 // Маршруты для работы с пользователями
@@ -370,39 +455,77 @@ app.put('/api/user', authenticateToken, (req, res) => {
     );
 });
 
-app.put('/api/user/avatar', authenticateToken, upload.single('avatar'), (req, res) => {
+app.put('/api/user/avatar', authenticateToken, upload.single('avatar'), async (req, res) => {
+  try {
     if (!req.file) {
-        return res.status(400).json({ error: 'Файл не загружен' });
+      return res.status(400).json({ error: 'Файл не загружен' });
+    }
+
+    // Проверяем MIME-тип еще раз (двойная проверка)
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'Недопустимый тип файла' });
     }
 
     const publicImgPath = path.join(__dirname, 'public', 'img');
     if (!fs.existsSync(publicImgPath)) {
-        fs.mkdirSync(publicImgPath, { recursive: true });
+      fs.mkdirSync(publicImgPath, { recursive: true });
     }
 
+    // Получаем текущий аватар пользователя
+    const user = await new Promise((resolve, reject) => {
+      db.get(
+        `SELECT avatar FROM users WHERE id = ?`,
+        [req.user.userId],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+
+    // Удаляем старый аватар, если он существует и не дефолтный
+    if (user?.avatar && !user.avatar.includes('avatar.jpg')) {
+      const oldAvatarPath = path.join(publicImgPath, path.basename(user.avatar));
+      if (fs.existsSync(oldAvatarPath)) {
+        fs.unlink(oldAvatarPath, (err) => {
+          if (err) console.error('Ошибка при удалении старого аватара:', err);
+        });
+      }
+    }
+
+    // Генерируем новое имя файла
     const newFileName = `avatar-${req.user.userId}-${Date.now()}${path.extname(req.file.originalname)}`;
     const targetPath = path.join(publicImgPath, newFileName);
     const avatarUrl = `/img/${newFileName}`;
 
-    fs.rename(req.file.path, targetPath, (err) => {
-        if (err) {
-            console.error('Ошибка при перемещении файла:', err);
-            return res.status(500).json({ error: 'Ошибка при сохранении файла' });
-        }
+    // Перемещаем файл из временной папки
+    await fs.promises.rename(req.file.path, targetPath);
 
-        db.run(
-            `UPDATE users SET avatar = ? WHERE id = ?`,
-            [avatarUrl, req.user.userId],
-            function(err) {
-                if (err) {
-                    console.error('Ошибка при обновлении аватарки в БД:', err);
-                    return res.status(500).json({ error: 'Ошибка при обновлении аватарки' });
-                }
-                
-                res.json({ avatar: avatarUrl });
-            }
-        );
+    // Обновляем запись в БД
+    await new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE users SET avatar = ? WHERE id = ?`,
+        [avatarUrl, req.user.userId],
+        function(err) {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
     });
+
+    res.json({ avatar: avatarUrl });
+  } catch (error) {
+    console.error('Avatar upload error:', error);
+    
+    // Удаляем временный файл в случае ошибки
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({ error: 'Ошибка при обновлении аватарки' });
+  }
 });
 
 // Маршруты для товаров (публичные)
