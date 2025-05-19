@@ -1,6 +1,6 @@
 /* Основные стили слайдера */
 .banner-slider {
-  width: calc(100% - 40px); /* Отступы по 20px с каждой стороны */
+  width: calc(100% - 40px);
   max-width: 1200px;
   margin: 30px auto;
   position: relative;
@@ -20,9 +20,6 @@
   position: absolute;
   width: 100%;
   height: 100%;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
   opacity: 0;
   transition: opacity 0.6s ease-in-out;
   display: flex;
@@ -36,21 +33,15 @@
   opacity: 1;
 }
 
-/* Фоновые изображения для слайдов */
-.slide-protein {
-  background: linear-gradient(135deg, #ff6b00 0%, #c14600 100%);
-}
-.slide-belt {
-  background: linear-gradient(135deg, #434343 0%, #000000 100%);
-}
-.slide-yoga {
-  background: linear-gradient(135deg, #00b09b 0%, #96c93d 100%);
-}
-.slide-gloves {
-  background: linear-gradient(135deg, #5b86e5 0%, #36d1dc 100%);
-}
-.slide-equipment {
-  background: linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%);
+.slide-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 /* Наложение для лучшей читаемости текста */
@@ -124,7 +115,7 @@
 /* Адаптивные стили */
 @media (max-width: 1200px) {
   .banner-slider {
-    width: calc(100% - 30px); /* Уменьшаем отступы */
+    width: calc(100% - 30px);
     margin: 25px auto;
   }
   

@@ -22,12 +22,13 @@
 }
 
 .product-image {
-    width: 100%;
-    height: auto;
-    object-fit: contain;
+    width: 328px;
+    height: 328px;
+    object-fit: cover; /* или 'contain' если хочешь всё изображение */
     margin-bottom: 10px;
     border-radius: 20px;
     background: #f9f9f9;
+    align-self: center; /* чтобы изображение было по центру карточки */
 }
 
 .product-info {

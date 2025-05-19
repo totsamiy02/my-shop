@@ -304,17 +304,107 @@ app.post('/api/forgot-password', async (req, res) => {
           return res.status(400).json({ error: 'Пользователь с таким email не найден' });
         }
 
-        // Генерируем токен
-        const resetToken = crypto.randomBytes(20).toString('hex');
-        const resetTokenExpires = Date.now() + 3600000; // 1 час
+        // Генерируем 6-значный код
+        const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const resetCodeExpires = Date.now() + 300000; // 5 минут
 
-        // Сохраняем токен в БД
+        // Сохраняем код в БД
         db.run(
           `UPDATE users SET 
            reset_token = ?,
            reset_token_expires = ?
            WHERE id = ?`,
-          [resetToken, resetTokenExpires, user.id],
+          [resetCode, resetCodeExpires, user.id],
+          async (err) => {
+            if (err) {
+              console.error('Database update error:', err);
+              return res.status(500).json({ error: 'Ошибка при обновлении данных' });
+            }
+
+            // Красивое письмо с HTML-версткой
+            const mailOptions = {
+              from: `"Поддержка магазина" <${process.env.EMAIL_USER}>`,
+              to: email,
+              subject: 'Код подтверждения для сброса пароля',
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+                  <div style="background-color: #ff6b00; padding: 20px; text-align: center;">
+                    <h1 style="color: white; margin: 0;">Восстановление пароля</h1>
+                  </div>
+                  <div style="padding: 20px;">
+                    <p style="font-size: 16px;">Для сброса пароля используйте следующий код подтверждения:</p>
+                    <div style="background-color: #f5f5f5; padding: 15px; text-align: center; margin: 20px 0; border-radius: 4px;">
+                      <span style="font-size: 28px; letter-spacing: 5px; font-weight: bold; color: #333;">${resetCode}</span>
+                    </div>
+                    <p style="font-size: 14px; color: #666;">Код действителен в течение 5 минут.</p>
+                    <p style="font-size: 14px; color: #666;">Если вы не запрашивали сброс пароля, проигнорируйте это письмо.</p>
+                  </div>
+                  <div style="background-color: #f9f9f9; padding: 15px; text-align: center; font-size: 12px; color: #666;">
+                    <p>Это письмо отправлено автоматически, пожалуйста, не отвечайте на него.</p>
+                  </div>
+                </div>
+              `,
+              // Добавляем текстовую версию для почтовых клиентов, которые не поддерживают HTML
+              text: `Для сброса пароля используйте следующий код: ${resetCode}\nКод действителен в течение 5 минут.\nЕсли вы не запрашивали сброс пароля, проигнорируйте это письмо.`
+            };
+
+            // Добавляем DKIM подпись и другие заголовки для предотвращения спама
+            mailOptions.headers = {
+              'X-Mailer': 'OurShop Mailer',
+              'X-Priority': '1',
+              'X-MSMail-Priority': 'High',
+              'Importance': 'High'
+            };
+
+            try {
+              await transporter.sendMail(mailOptions);
+              res.json({ 
+                success: true,
+                message: 'Код подтверждения отправлен на ваш email' 
+              });
+            } catch (mailError) {
+              console.error('Mail sending error:', mailError);
+              res.status(500).json({ error: 'Ошибка при отправке письма' });
+            }
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('Server error:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+app.post('/api/resend-reset-code', async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    // Проверяем существование пользователя
+    db.get(
+      `SELECT * FROM users WHERE email = ?`, 
+      [email],
+      async (err, user) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+
+        if (!user) {
+          return res.status(400).json({ error: 'Пользователь с таким email не найден' });
+        }
+
+        // Генерируем новый 6-значный код
+        const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const resetCodeExpires = Date.now() + 300000; // 5 минут
+
+        // Обновляем код в БД
+        db.run(
+          `UPDATE users SET 
+           reset_token = ?,
+           reset_token_expires = ?
+           WHERE id = ?`,
+          [resetCode, resetCodeExpires, user.id],
           async (err) => {
             if (err) {
               console.error('Database update error:', err);
@@ -325,13 +415,12 @@ app.post('/api/forgot-password', async (req, res) => {
             const mailOptions = {
               from: `"Поддержка магазина" <${process.env.EMAIL_USER}>`,
               to: email,
-              subject: 'Восстановление пароля',
+              subject: 'Новый код подтверждения',
               html: `
-                <h2>Восстановление пароля</h2>
+                <h2>Новый код подтверждения</h2>
                 <p>Для сброса пароля используйте следующий код:</p>
-                <h3 style="font-size: 24px; letter-spacing: 2px;">${resetToken}</h3>
-                <p>Код действителен в течение 1 часа.</p>
-                <p>Если вы не запрашивали сброс пароля, проигнорируйте это письмо.</p>
+                <h3 style="font-size: 24px; letter-spacing: 2px;">${resetCode}</h3>
+                <p>Код действителен в течение 5 минут.</p>
               `
             };
 
@@ -339,7 +428,7 @@ app.post('/api/forgot-password', async (req, res) => {
               await transporter.sendMail(mailOptions);
               res.json({ 
                 success: true,
-                message: 'Код восстановления отправлен на ваш email' 
+                message: 'Новый код подтверждения отправлен' 
               });
             } catch (mailError) {
               console.error('Mail sending error:', mailError);
@@ -347,6 +436,39 @@ app.post('/api/forgot-password', async (req, res) => {
             }
           }
         );
+      }
+    );
+  } catch (error) {
+    console.error('Server error:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+app.post('/api/verify-reset-code', async (req, res) => {
+  const { email, code } = req.body;
+
+  try {
+    // Проверяем код и срок его действия
+    db.get(
+      `SELECT * FROM users 
+       WHERE email = ? 
+       AND reset_token = ?
+       AND reset_token_expires > ?`,
+      [email, code, Date.now()],
+      (err, user) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+
+        if (!user) {
+          return res.status(400).json({ error: 'Неверный или просроченный код подтверждения' });
+        }
+
+        res.json({ 
+          success: true,
+          message: 'Код подтвержден' 
+        });
       }
     );
   } catch (error) {

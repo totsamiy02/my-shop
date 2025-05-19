@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './AuthModal.css';
+import flags from './data/flags'; // Импортируем данные о странах
 
 const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
     const [formData, setFormData] = useState({
@@ -10,28 +11,45 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
         password: '',
         confirmPassword: ''
     });
+    
     const [resetData, setResetData] = useState({
-        code: '',
+        email: '',
+        code: ['', '', '', '', '', ''],
         newPassword: '',
         confirmPassword: ''
     });
+    
     const [errors, setErrors] = useState({});
     const [message, setMessage] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [resetPasswordMode, setResetPasswordMode] = useState(false);
+    const [resetStep, setResetStep] = useState(0);
+    const [timer, setTimer] = useState(0);
+    const [codeVerified, setCodeVerified] = useState(false);
+    const [selectedCountry, setSelectedCountry] = useState(flags[0]); // По умолчанию Россия
+    const [showCountrySelect, setShowCountrySelect] = useState(false);
+
+    // Таймер для кода подтверждения
+    useEffect(() => {
+        if (timer > 0) {
+            const interval = setInterval(() => {
+                setTimer(prev => prev - 1);
+            }, 1000);
+            return () => clearInterval(interval);
+        }
+    }, [timer]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         
         if (name === 'phone') {
-            let formattedValue = value.replace(/\D/g, '');
+            // Оставляем только цифры
+            const digits = value.replace(/\D/g, '');
+            // Форматируем номер телефона
+            let formattedValue = '';
             
-            if (formattedValue.length > 0) {
-                formattedValue = '+7 (' + formattedValue.substring(1, 4) + ') - ' + 
-                                 formattedValue.substring(4, 7) + ' - ' + 
-                                 formattedValue.substring(7, 9) + ' - ' + 
-                                 formattedValue.substring(9, 11);
+            if (digits.length > 0) {
+                formattedValue = `${selectedCountry.code} ${digits.substring(0, 10)}`;
             }
             
             setFormData({
@@ -55,42 +73,121 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
         }));
     };
 
+    const handleCodeChange = (index, value) => {
+        // Разрешаем только цифры
+        if (/^\d?$/.test(value)) {
+            const newCode = [...resetData.code];
+            newCode[index] = value;
+            
+            setResetData({
+                ...resetData,
+                code: newCode
+            });
+            
+            // Автоматически переходим к следующему полю
+            if (value && index < 5) {
+                document.getElementById(`code-input-${index + 1}`).focus();
+            }
+            
+            // Проверяем код при вводе всех 6 цифр
+            if (newCode.every(c => c) && index === 5) {
+                verifyCode(newCode.join(''));
+            }
+        }
+    };
+
+    const validatePhone = (phone) => {
+        const digits = phone.replace(/\D/g, '');
+        return digits.length === 11;
+    };
+
     const validate = () => {
         const newErrors = {};
         
-        if (mode === 'register') {
-            if (!formData.firstName.trim()) newErrors.firstName = 'Введите имя';
-            if (!formData.lastName.trim()) newErrors.lastName = 'Введите фамилию';
-            if (!formData.phone || formData.phone.replace(/\D/g, '').length !== 11) {
-                newErrors.phone = 'Введите корректный номер телефона';
+        if (resetStep > 0) {
+            if (resetStep === 1 && !resetData.email) {
+                newErrors.email = 'Введите email';
             }
-        }
-        
-        if (!formData.email || !/^\S+@\S+\.\S+$/.test(formData.email)) {
-            newErrors.email = 'Введите корректный email';
-        }
-        
-        if (!formData.password || formData.password.length < 8) {
-            newErrors.password = 'Пароль должен содержать минимум 8 символов';
-        }
-        
-        if ((mode === 'register' || resetPasswordMode) && 
-            (resetPasswordMode 
-                ? resetData.newPassword !== resetData.confirmPassword 
-                : formData.password !== formData.confirmPassword)) {
-            newErrors.confirmPassword = 'Пароли не совпадают';
+            if (resetStep === 2 && !resetData.code.every(c => c)) {
+                newErrors.code = 'Введите полный код подтверждения';
+            }
+            if (resetStep === 3) {
+                if (!resetData.newPassword || resetData.newPassword.length < 8) {
+                    newErrors.newPassword = 'Пароль должен содержать минимум 8 символов';
+                }
+                if (resetData.newPassword !== resetData.confirmPassword) {
+                    newErrors.confirmPassword = 'Пароли не совпадают';
+                }
+            }
+        } else {
+            if (mode === 'register') {
+                if (!formData.firstName.trim()) newErrors.firstName = 'Введите имя';
+                if (!formData.lastName.trim()) newErrors.lastName = 'Введите фамилию';
+                if (!validatePhone(formData.phone)) {
+                    newErrors.phone = 'Введите корректный номер телефона';
+                }
+            }
+            
+            if (!formData.email || !/^\S+@\S+\.\S+$/.test(formData.email)) {
+                newErrors.email = 'Введите корректный email';
+            }
+            
+            if (!formData.password || formData.password.length < 8) {
+                newErrors.password = 'Пароль должен содержать минимум 8 символов';
+            }
+            
+            if (mode === 'register' && formData.password !== formData.confirmPassword) {
+                newErrors.confirmPassword = 'Пароли не совпадают';
+            }
         }
         
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
+    const verifyCode = async (code) => {
+        setIsLoading(true);
+        try {
+            const response = await fetch('/api/verify-reset-code', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    email: resetData.email,
+                    code: code
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Неверный код подтверждения');
+            }
+            
+            setCodeVerified(true);
+            setResetStep(3);
+            setMessage('Код подтвержден. Теперь задайте новый пароль.');
+        } catch (error) {
+            setMessage('Неверный код подтверждения. Попробуйте еще раз.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        if (resetPasswordMode) {
-            await handleResetPassword();
-            return;
+        if (resetStep > 0) {
+            if (resetStep === 1) {
+                await sendResetCode();
+                return;
+            }
+            
+            if (resetStep === 3) {
+                await resetPassword();
+                return;
+            }
         }
         
         if (!validate()) return;
@@ -147,11 +244,8 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
         }
     };
 
-    const handleForgotPassword = async () => {
-        if (!formData.email) {
-            setErrors({ ...errors, email: 'Введите email для восстановления' });
-            return;
-        }
+    const sendResetCode = async () => {
+        if (!validate()) return;
         
         setIsLoading(true);
         setMessage('');
@@ -162,7 +256,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ email: formData.email })
+                body: JSON.stringify({ email: resetData.email })
             });
             
             const data = await response.json();
@@ -171,8 +265,14 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                 throw new Error(data.error || 'Ошибка сервера');
             }
             
-            setMessage(data.message || 'Код подтверждения отправлен на ваш email');
-            setResetPasswordMode(true);
+            setMessage('6-значный код отправлен на ваш email. Проверьте почту.');
+            setResetStep(2);
+            setTimer(300); // 5 минут таймер
+            setCodeVerified(false);
+            setResetData(prev => ({
+                ...prev,
+                code: ['', '', '', '', '', '']
+            }));
         } catch (error) {
             setMessage(error.message);
         } finally {
@@ -180,17 +280,8 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
         }
     };
 
-    const handleResetPassword = async (e) => {
-        e.preventDefault();
-        
-        if (!validate()) {
-            return;
-        }
-        
-        if (!resetData.code) {
-            setMessage('Введите код подтверждения');
-            return;
-        }
+    const resetPassword = async () => {
+        if (!validate()) return;
         
         setIsLoading(true);
         setMessage('');
@@ -202,7 +293,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    token: resetData.code,
+                    token: resetData.code.join(''),
                     newPassword: resetData.newPassword
                 })
             });
@@ -215,12 +306,15 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
             
             setMessage('Пароль успешно изменен! Теперь вы можете войти.');
             setTimeout(() => {
-                setResetPasswordMode(false);
+                setResetStep(0);
                 setResetData({
-                    code: '',
+                    email: '',
+                    code: ['', '', '', '', '', ''],
                     newPassword: '',
                     confirmPassword: ''
                 });
+                setCodeVerified(false);
+                onModeChange('login');
             }, 2000);
         } catch (error) {
             console.error('Reset error:', error);
@@ -230,14 +324,74 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
         }
     };
 
-    const handleCancelReset = () => {
-        setResetPasswordMode(false);
+    const startPasswordReset = () => {
+        setResetData({
+            ...resetData,
+            email: formData.email,
+            code: ['', '', '', '', '', '']
+        });
+        setResetStep(1);
+        setMessage('');
+        setErrors({});
+        setCodeVerified(false);
+    };
+
+    const cancelReset = () => {
+        setResetStep(0);
         setMessage('');
         setErrors({});
         setResetData({
-            code: '',
+            email: '',
+            code: ['', '', '', '', '', ''],
             newPassword: '',
             confirmPassword: ''
+        });
+        setCodeVerified(false);
+    };
+
+    const resendCode = async () => {
+        if (timer > 0) return;
+        
+        setIsLoading(true);
+        setMessage('');
+        
+        try {
+            const response = await fetch('/api/resend-reset-code', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email: resetData.email })
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Ошибка сервера');
+            }
+            
+            setMessage('Новый код отправлен на ваш email');
+            setTimer(300); // 5 минут таймер
+            setCodeVerified(false);
+            setResetData(prev => ({
+                ...prev,
+                code: ['', '', '', '', '', '']
+            }));
+        } catch (error) {
+            setMessage(error.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const selectCountry = (country) => {
+        setSelectedCountry(country);
+        setShowCountrySelect(false);
+        // Обновляем номер телефона с новым кодом страны
+        const digits = formData.phone.replace(/\D/g, '').substring(1);
+        setFormData({
+            ...formData,
+            phone: country.code + (digits ? ` ${digits}` : '')
         });
     };
 
@@ -249,79 +403,20 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                 <button className="close-button" onClick={onClose}>×</button>
                 
                 <h2>
-                    {resetPasswordMode 
-                        ? 'Сброс пароля' 
-                        : mode === 'login' 
-                            ? 'Вход' 
-                            : 'Регистрация'}
+                    {resetStep === 1 ? 'Восстановление пароля' :
+                     resetStep === 2 ? 'Введите код подтверждения' :
+                     resetStep === 3 ? 'Новый пароль' :
+                     mode === 'login' ? 'Вход' : 'Регистрация'}
                 </h2>
                 
                 {message && (
-                    <div className={`message ${message.includes('успеш') || message.includes('изменен') ? 'success' : 'error'}`}>
+                    <div className={`message ${message.includes('успеш') || message.includes('отправлен') ? 'success' : 'error'}`}>
                         {message}
                     </div>
                 )}
                 
-                <form onSubmit={resetPasswordMode ? handleResetPassword : handleSubmit}>
-                    {resetPasswordMode ? (
-                        <>
-                            <div className="form-group">
-                                <label>Код подтверждения</label>
-                                <input
-                                    type="text"
-                                    name="code"
-                                    value={resetData.code}
-                                    onChange={handleResetChange}
-                                    placeholder="Введите код из письма"
-                                />
-                            </div>
-                            
-                            <div className="form-group">
-                                <label>Новый пароль</label>
-                                <div className="password-input">
-                                    <input
-                                        type={showPassword ? "text" : "password"}
-                                        name="newPassword"
-                                        value={resetData.newPassword}
-                                        onChange={handleResetChange}
-                                        placeholder="Введите новый пароль"
-                                    />
-                                    <button 
-                                        type="button" 
-                                        className="show-password"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                    >
-                                        {showPassword ? '🙈' : '👁️'}
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <div className="form-group">
-                                <label>Подтверждение пароля</label>
-                                <input
-                                    type={showPassword ? "text" : "password"}
-                                    name="confirmPassword"
-                                    value={resetData.confirmPassword}
-                                    onChange={handleResetChange}
-                                    placeholder="Повторите новый пароль"
-                                />
-                                {errors.confirmPassword && <span className="error-text">{errors.confirmPassword}</span>}
-                            </div>
-                            
-                            <button type="submit" className="submit-button" disabled={isLoading}>
-                                {isLoading ? 'Сохранение...' : 'Сменить пароль'}
-                            </button>
-                            
-                            <button 
-                                type="button" 
-                                className="cancel-button" 
-                                onClick={handleCancelReset}
-                                disabled={isLoading}
-                            >
-                                Отмена
-                            </button>
-                        </>
-                    ) : (
+                <form onSubmit={handleSubmit}>
+                    {resetStep === 0 ? (
                         <>
                             {mode === 'register' && (
                                 <>
@@ -351,16 +446,41 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                                         {errors.lastName && <span className="error-text">{errors.lastName}</span>}
                                     </div>
                                     
-                                    <div className="form-group">
+                                    <div className="form-group phone-group">
                                         <label>Номер телефона</label>
-                                        <input
-                                            type="text"
-                                            name="phone"
-                                            value={formData.phone}
-                                            onChange={handleChange}
-                                            placeholder="+7 (XXX) - XXX - XX - XX"
-                                            className={errors.phone ? 'error' : ''}
-                                        />
+                                        <div className="phone-input-container">
+                                            <div 
+                                                className="country-selector"
+                                                onClick={() => setShowCountrySelect(!showCountrySelect)}
+                                            >
+                                                <span className="flag">{selectedCountry.flag}</span>
+                                                <span className="code">{selectedCountry.code}</span>
+                                                <span className="arrow">▼</span>
+                                            </div>
+                                            {showCountrySelect && (
+                                                <div className="country-dropdown">
+                                                    {flags.map(country => (
+                                                        <div 
+                                                            key={country.code}
+                                                            className="country-option"
+                                                            onClick={() => selectCountry(country)}
+                                                        >
+                                                            <span className="flag">{country.flag}</span>
+                                                            <span className="name">{country.name}</span>
+                                                            <span className="code">{country.code}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <input
+                                                type="text"
+                                                name="phone"
+                                                value={formData.phone.substring(selectedCountry.code.length)}
+                                                onChange={handleChange}
+                                                placeholder="XXX XXX XX XX"
+                                                className={`phone-input ${errors.phone ? 'error' : ''}`}
+                                            />
+                                        </div>
                                         {errors.phone && <span className="error-text">{errors.phone}</span>}
                                     </div>
                                 </>
@@ -419,22 +539,147 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                             <button type="submit" className="submit-button" disabled={isLoading}>
                                 {isLoading ? 'Загрузка...' : mode === 'login' ? 'Войти' : 'Зарегистрироваться'}
                             </button>
+                            
+                            <div className="auth-switch">
+                                {mode === 'login' ? (
+                                    <>
+                                        <p>Нет аккаунта? <button type="button" onClick={() => onModeChange('register')}>Зарегистрироваться</button></p>
+                                        <p>Забыли пароль? <button type="button" onClick={startPasswordReset}>Восстановить</button></p>
+                                    </>
+                                ) : (
+                                    <p>Уже есть аккаунт? <button type="button" onClick={() => onModeChange('login')}>Войти</button></p>
+                                )}
+                            </div>
                         </>
-                    )}
+                    ) : resetStep === 1 ? (
+                        <>
+                            <div className="form-group">
+                                <label>Email</label>
+                                <input
+                                    type="email"
+                                    name="email"
+                                    value={resetData.email}
+                                    onChange={(e) => setResetData({...resetData, email: e.target.value})}
+                                    placeholder="Введите email для восстановления"
+                                    className={errors.email ? 'error' : ''}
+                                />
+                                {errors.email && <span className="error-text">{errors.email}</span>}
+                            </div>
+                            
+                            <button type="submit" className="submit-button" disabled={isLoading}>
+                                {isLoading ? 'Отправка...' : 'Отправить код'}
+                            </button>
+                            
+                            <button 
+                                type="button" 
+                                className="cancel-button" 
+                                onClick={cancelReset}
+                                disabled={isLoading}
+                            >
+                                Отмена
+                            </button>
+                        </>
+                    ) : resetStep === 2 ? (
+                        <>
+                            <div className="form-group">
+                                <label>6-значный код подтверждения</label>
+                                <div className="code-inputs">
+                                    {[0, 1, 2, 3, 4, 5].map((index) => (
+                                        <input
+                                            key={index}
+                                            id={`code-input-${index}`}
+                                            type="text"
+                                            maxLength={1}
+                                            value={resetData.code[index]}
+                                            onChange={(e) => handleCodeChange(index, e.target.value)}
+                                            className={`code-input ${codeVerified ? 'verified' : ''}`}
+                                            inputMode="numeric"
+                                        />
+                                    ))}
+                                </div>
+                                {errors.code && <span className="error-text">{errors.code}</span>}
+                                {codeVerified && (
+                                    <div className="verification-success">
+                                        <span>✓</span> Код подтвержден
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="timer">
+                                {timer > 0 ? (
+                                    <span>Можно запросить новый код через {Math.floor(timer / 60)}:{timer % 60 < 10 ? '0' : ''}{timer % 60}</span>
+                                ) : (
+                                    <button 
+                                        type="button" 
+                                        className="resend-button"
+                                        onClick={resendCode}
+                                    >
+                                        Отправить код повторно
+                                    </button>
+                                )}
+                            </div>
+                            
+                            <button 
+                                type="button" 
+                                className="cancel-button" 
+                                onClick={cancelReset}
+                                disabled={isLoading}
+                            >
+                                Отмена
+                            </button>
+                        </>
+                    ) : resetStep === 3 ? (
+                        <>
+                            <div className="form-group">
+                                <label>Новый пароль</label>
+                                <div className="password-input">
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        name="newPassword"
+                                        value={resetData.newPassword}
+                                        onChange={handleResetChange}
+                                        placeholder="Введите новый пароль"
+                                        className={errors.newPassword ? 'error' : ''}
+                                    />
+                                    <button 
+                                        type="button" 
+                                        className="show-password"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                    >
+                                        {showPassword ? '🙈' : '👁️'}
+                                    </button>
+                                </div>
+                                {errors.newPassword && <span className="error-text">{errors.newPassword}</span>}
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Подтверждение пароля</label>
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    name="confirmPassword"
+                                    value={resetData.confirmPassword}
+                                    onChange={handleResetChange}
+                                    placeholder="Повторите новый пароль"
+                                    className={errors.confirmPassword ? 'error' : ''}
+                                />
+                                {errors.confirmPassword && <span className="error-text">{errors.confirmPassword}</span>}
+                            </div>
+                            
+                            <button type="submit" className="submit-button" disabled={isLoading}>
+                                {isLoading ? 'Сохранение...' : 'Сменить пароль'}
+                            </button>
+                            
+                            <button 
+                                type="button" 
+                                className="cancel-button" 
+                                onClick={cancelReset}
+                                disabled={isLoading}
+                            >
+                                Отмена
+                            </button>
+                        </>
+                    ) : null}
                 </form>
-                
-                {!resetPasswordMode && (
-                    <div className="auth-switch">
-                        {mode === 'login' ? (
-                            <>
-                                <p>Нет аккаунта? <button onClick={() => onModeChange('register')}>Зарегистрироваться</button></p>
-                                <p>Забыли пароль? <button onClick={handleForgotPassword}>Восстановить</button></p>
-                            </>
-                        ) : (
-                            <p>Уже есть аккаунт? <button onClick={() => onModeChange('login')}>Войти</button></p>
-                        )}
-                    </div>
-                )}
             </div>
         </div>
     );
