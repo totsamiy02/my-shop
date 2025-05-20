@@ -12,6 +12,7 @@ function ProductList() {
     const [products, setProducts] = useState([]);
     const [filteredProducts, setFilteredProducts] = useState([]);
     const [showNotification, setShowNotification] = useState(false);
+    const [notificationProductName, setNotificationProductName] = useState('');
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [basket, setBasket] = useState(() => {
         const savedBasket = localStorage.getItem('basket');
@@ -66,11 +67,11 @@ function ProductList() {
     };
 
     const handleAddToBasket = (product) => {
-        const productInDb = products.find(p => p.name === product.title);
+        const productInDb = products.find(p => p.id === product.id);
         if (!productInDb || productInDb.quantity <= 0) return;
 
         setBasket(prevBasket => {
-            const existingProduct = prevBasket.find(item => item.title === product.title);
+            const existingProduct = prevBasket.find(item => item.id === product.id);
 
             if (existingProduct) {
                 if (existingProduct.quantity >= productInDb.quantity) {
@@ -78,18 +79,19 @@ function ProductList() {
                     return prevBasket;
                 }
                 return prevBasket.map(item =>
-                    item.title === product.title
+                    item.id === product.id
                         ? { ...item, quantity: item.quantity + 1 }
                         : item
                 );
             }
             return [...prevBasket, {
                 ...product,
-                id: Date.now(),
-                quantity: 1
+                quantity: 1,
+                maxQuantity: productInDb.quantity
             }];
         });
 
+        setNotificationProductName(product.name || product.title);
         setShowNotification(true);
         setTimeout(() => setShowNotification(false), 3000);
     };
@@ -140,7 +142,6 @@ function ProductList() {
                             quantity={product.quantity}
                             handleAddToBasket={handleAddToBasket}
                             onCardClick={() => setSelectedProduct(product)}
-                            addToCartText={t('product_list.add_to_cart')}
                         />
                     ))
                 )}
@@ -160,15 +161,16 @@ function ProductList() {
                 </div>
             )}
 
-            <Notification message={t('product_list.item_added')} show={showNotification} />
+            <Notification 
+                message={`Товар "${notificationProductName}" добавлен в корзину`} 
+                show={showNotification} 
+            />
 
             {selectedProduct && (
                 <ProductModal
                     product={selectedProduct}
                     onClose={() => setSelectedProduct(null)}
                     onAddToCart={handleAddToBasket}
-                    onOrderComplete={handleOrderComplete}
-                    addToCartText={t('product_list.add_to_cart')}
                 />
             )}
         </div>

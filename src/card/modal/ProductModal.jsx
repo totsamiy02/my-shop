@@ -4,7 +4,7 @@ import heartOutline from '../../img/сердце.svg';
 import heartFilled from '../../img/сердце черное.svg';
 import { useAuth } from '../../hook/AuthContext';
 
-function ProductModal({ product, onClose, onAddToCart, onOrderComplete }) {
+function ProductModal({ product, onClose, onAddToCart }) {
     const [isZoomed, setIsZoomed] = useState(false);
     const [isClosing, setIsClosing] = useState(false);
     const [isZoomClosing, setIsZoomClosing] = useState(false);
@@ -53,71 +53,51 @@ function ProductModal({ product, onClose, onAddToCart, onOrderComplete }) {
     };
 
     const toggleFavorite = async (e) => {
-    e.stopPropagation();
-
-    if (!user) {
-        alert('Для добавления в избранное необходимо войти в систему');
-        return;
-    }
-
-    try {
-        if (isFavorite) {
-            await fetch(`/api/favorites/remove`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ productId: product.id })
-            });
-        } else {
-            await fetch(`/api/favorites/add`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ productId: product.id })
-            });
-        }
-        setIsFavorite(!isFavorite);
-        window.dispatchEvent(new Event('favoritesUpdated'));
-    } catch (error) {
-        console.error('Error toggling favorite:', error);
-    }
-};
-
-    const handleAddToCart = async (e) => {
         e.stopPropagation();
 
-        // Вызов колбэка, добавление товара в корзину
-        onAddToCart({
-            image: product.image,
-            title: product.name,
-            price: product.price,
-            id: product.id
-        });
+        if (!user) {
+            alert('Для добавления в избранное необходимо войти в систему');
+            return;
+        }
 
         try {
-            // Здесь можно отправить заказ или оформить его (если есть логика отправки на сервер)
-            // Например:
-            const response = await fetch('/api/order', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify({ productId: product.id, quantity: 1 })
-            });
-
-            if (response.ok) {
-                if (onOrderComplete) onOrderComplete(); // ✅ вызов колбэка из родителя
+            if (isFavorite) {
+                await fetch(`/api/favorites/remove`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ productId: product.id })
+                });
             } else {
-                console.error('Ошибка при оформлении заказа');
+                await fetch(`/api/favorites/add`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ productId: product.id })
+                });
             }
+            setIsFavorite(!isFavorite);
+            window.dispatchEvent(new Event('favoritesUpdated'));
         } catch (error) {
-            console.error('Ошибка запроса оформления:', error);
+            console.error('Error toggling favorite:', error);
         }
+    };
+
+    const handleAddToCart = (e) => {
+        e.stopPropagation();
+        
+        onAddToCart({
+            id: product.id,
+            title: product.name,
+            price: product.price,
+            image: product.image,
+            quantity: 1,
+            maxQuantity: product.quantity
+        });
 
         handleClose();
     };

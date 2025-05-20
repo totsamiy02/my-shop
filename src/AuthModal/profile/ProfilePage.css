@@ -370,3 +370,41 @@
         padding: 20px 10px;
     }
 }
+
+/* Стили для телефонного ввода */
+.phone-input {
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.phone-input:focus-within {
+    border-color: #ff6b00;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.2);
+}
+
+.PhoneInputCountry {
+    margin-right: 10px;
+}
+
+.PhoneInputInput {
+    border: none;
+    outline: none;
+    font-size: 1rem;
+    width: 100%;
+}
+
+.phone-error {
+    color: #ff3333;
+    font-size: 0.8rem;
+    margin-top: 5px;
+}
+
+/* Стиль для невалидного номера */
+.phone-input.invalid {
+    border-color: #ff3333;
+}

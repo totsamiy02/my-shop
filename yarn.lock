@@ -3442,6 +3442,11 @@ cjs-module-lexer@^1.0.0:
   resolved "https://registry.npmjs.org/cjs-module-lexer/-/cjs-module-lexer-1.4.3.tgz"
   integrity sha512-9z8TZaGM1pfswYeXrUpzPrkx8UnWYdhJclsiYMm6x/w5+nN+8Tf/LnAgfLGQCm59qAOxU8WwHEq2vNwF6i4j+Q==
 
+classnames@^2.5.1:
+  version "2.5.1"
+  resolved "https://registry.npmjs.org/classnames/-/classnames-2.5.1.tgz"
+  integrity sha512-saHYOzhIQs6wy2sVxTM6bUDsQO4F50V9RQ22qBpEdCW+I+/Wmke2HOl6lS6dTpdxVhb88/I6+Hs+438c3lfUow==
+
 clean-css@^5.2.2:
   version "5.3.3"
   resolved "https://registry.npmjs.org/clean-css/-/clean-css-5.3.3.tgz"
@@ -3729,7 +3734,7 @@ cosmiconfig@^7.0.0:
     path-type "^4.0.0"
     yaml "^1.10.0"
 
-country-flag-icons@^1.5.19:
+country-flag-icons@^1.5.17, country-flag-icons@^1.5.19:
   version "1.5.19"
   resolved "https://registry.npmjs.org/country-flag-icons/-/country-flag-icons-1.5.19.tgz"
   integrity sha512-D/ZkRyj+ywJC6b2IrAN3/tpbReMUqmuRLlcKFoY/o0+EPQN9Ev/e8tV+D3+9scvu/tarxwLErNwS73C3yzxs/g==
@@ -5952,6 +5957,13 @@ ini@^1.3.5, ini@~1.3.0:
   resolved "https://registry.npmjs.org/ini/-/ini-1.3.8.tgz"
   integrity sha512-JV/yugV2uzW5iMRSiZAyDtQd+nxtUnjeLt0acNdw98kKLrvuRVyB80tsREOE7yvGVgalhZ6RNXCmEHkUKBKxew==
 
+input-format@^0.3.10:
+  version "0.3.14"
+  resolved "https://registry.npmjs.org/input-format/-/input-format-0.3.14.tgz"
+  integrity sha512-gHMrgrbCgmT4uK5Um5eVDUohuV9lcs95ZUUN9Px2Y0VIfjTzT2wF8Q3Z4fwLFm7c5Z2OXCm53FHoovj6SlOKdg==
+  dependencies:
+    prop-types "^15.8.1"
+
 internal-slot@^1.1.0:
   version "1.1.0"
   resolved "https://registry.npmjs.org/internal-slot/-/internal-slot-1.1.0.tgz"
@@ -7098,6 +7110,11 @@ levn@~0.3.0:
   dependencies:
     prelude-ls "~1.1.2"
     type-check "~0.3.2"
+
+libphonenumber-js@^1.11.20:
+  version "1.12.8"
+  resolved "https://registry.npmjs.org/libphonenumber-js/-/libphonenumber-js-1.12.8.tgz"
+  integrity sha512-f1KakiQJa9tdc7w1phC2ST+DyxWimy9c3g3yeF+84QtEanJr2K77wAmBPP22riU05xldniHsvXuflnLZ4oysqA==
 
 lilconfig@^2.0.3:
   version "2.1.0"
@@ -9018,7 +9035,7 @@ react-dev-utils@^12.0.1:
     strip-ansi "^6.0.1"
     text-table "^0.2.0"
 
-"react-dom@^18 || ^19", "react-dom@^18.0.0 || ^19.0.0", react-dom@^19.1.0, react-dom@>=16.8:
+"react-dom@^18 || ^19", "react-dom@^18.0.0 || ^19.0.0", react-dom@^19.1.0, react-dom@>=16.8, react-dom@>=18.1.0:
   version "19.1.0"
   resolved "https://registry.npmjs.org/react-dom/-/react-dom-19.1.0.tgz"
   integrity sha512-Xs1hdnE+DyKgeHJeJznQmYMIBG3TKIHJJT95Q58nHLSrElKlGQqDTR2HQ9fx5CN/Gk6Vh/kupBTDLU11/nDk/g==
@@ -9057,6 +9074,17 @@ react-is@^18.0.0:
   version "18.3.1"
   resolved "https://registry.npmjs.org/react-is/-/react-is-18.3.1.tgz"
   integrity sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==
+
+react-phone-number-input@^3.4.12:
+  version "3.4.12"
+  resolved "https://registry.npmjs.org/react-phone-number-input/-/react-phone-number-input-3.4.12.tgz"
+  integrity sha512-Raob77KdtLGm49iC6nuOX9qy6Mg16idkgC7Y1mHmvG2WBYoauHpzxYNlfmFskQKeiztrJIwPhPzBhjFwjenNCA==
+  dependencies:
+    classnames "^2.5.1"
+    country-flag-icons "^1.5.17"
+    input-format "^0.3.10"
+    libphonenumber-js "^1.11.20"
+    prop-types "^15.8.1"
 
 react-refresh@^0.11.0, "react-refresh@>=0.10.0 <1.0.0":
   version "0.11.0"
@@ -9140,7 +9168,7 @@ react-toastify@^11.0.5:
   dependencies:
     clsx "^2.1.1"
 
-react@*, "react@^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^18 || ^19", "react@^18.0.0 || ^19.0.0", react@^19.1.0, "react@>= 16", "react@>= 16.8.0", react@>=16.8:
+react@*, "react@^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^18 || ^19", "react@^18.0.0 || ^19.0.0", react@^19.1.0, "react@>= 16", "react@>= 16.8.0", react@>=16.8, react@>=18.1.0:
   version "19.1.0"
   resolved "https://registry.npmjs.org/react/-/react-19.1.0.tgz"
   integrity sha512-FS+XFBNvn3GTAWq26joslQgWNoFu08F4kl0J4CgdNKADkdSGXQyTCnKteIAJy96Br6YbpEU1LSzV5dYtjMkMDg==

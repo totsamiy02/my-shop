@@ -6,6 +6,9 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ConfirmationModal from '../../Notification/ConfirmationModal.jsx';
 import './ProfilePage.css';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
+import { isValidPhoneNumber } from 'react-phone-number-input';
 
 function ProfilePage() {
     const [user, setUser] = useState(null);
@@ -27,7 +30,7 @@ function ProfilePage() {
     const [pendingAction, setPendingAction] = useState(null);
     const navigate = useNavigate();
 
-        useEffect(() => {
+    useEffect(() => {
         const fetchUserData = async () => {
             const token = localStorage.getItem('token');
             if (!token) {
@@ -65,18 +68,25 @@ function ProfilePage() {
                 toast.error('Не удалось загрузить профиль');
                 navigate('/login');
             } finally {
-                setLoading(false); // Гарантированно снимаем индикатор загрузки
+                setLoading(false);
             }
         };
 
         fetchUserData();
-    }, [navigate]); // Только navigate в зависимостях
+    }, [navigate]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({
             ...prev,
             [name]: value
+        }));
+    };
+
+    const handlePhoneChange = (phone) => {
+        setFormData(prev => ({
+            ...prev,
+            phone: phone || ''
         }));
     };
 
@@ -105,6 +115,10 @@ function ProfilePage() {
 
     const handleSaveProfile = async () => {
         try {
+            if (formData.phone && !isValidPhoneNumber(formData.phone)) {
+                throw new Error('Введите корректный номер телефона');
+            }
+
             const token = localStorage.getItem('token');
             
             if (avatarFile) {
@@ -315,13 +329,17 @@ function ProfilePage() {
                                     </div>
                                     <div className="form-group">
                                         <label>Телефон</label>
-                                        <input
-                                            type="tel"
-                                            name="phone"
+                                        <PhoneInput
+                                            international
+                                            defaultCountry="RU"
                                             value={formData.phone}
-                                            onChange={handleInputChange}
-                                            placeholder="Введите ваш телефон"
+                                            onChange={handlePhoneChange}
+                                            placeholder="Введите номер телефона"
+                                            className={`phone-input ${formData.phone && !isValidPhoneNumber(formData.phone) ? 'invalid' : ''}`}
                                         />
+                                        {formData.phone && !isValidPhoneNumber(formData.phone) && (
+                                            <div className="phone-error">Некорректный номер телефона</div>
+                                        )}
                                     </div>
 
                                     {!showPasswordForm && (
@@ -401,6 +419,7 @@ function ProfilePage() {
                                         <button 
                                             className="save-button"
                                             onClick={() => handleActionConfirmation('saveProfile')}
+                                            disabled={formData.phone && !isValidPhoneNumber(formData.phone)}
                                         >
                                             Сохранить профиль
                                         </button>
@@ -422,7 +441,9 @@ function ProfilePage() {
                                     </div>
                                     <div className="info-row">
                                         <span className="info-label">Телефон:</span>
-                                        <span className="info-value">{user.phone}</span>
+                                        <span className="info-value">
+                                            {user.phone || 'Не указан'}
+                                        </span>
                                     </div>
                                     <div className="info-row">
                                         <span className="info-label">Статус:</span>
