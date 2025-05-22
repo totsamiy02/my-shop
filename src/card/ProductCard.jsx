@@ -41,6 +41,8 @@ function ProductCard({ id, image, title, price, quantity, handleAddToBasket, onC
     }
   };
 
+  const isOutOfStock = quantity <= 0;
+
   return (
     <div className="product-card" onClick={onCardClick}>
       <button
@@ -63,22 +65,26 @@ function ProductCard({ id, image, title, price, quantity, handleAddToBasket, onC
         <span className="product-title">{title}</span>
         <span className="product-price">{price}₽</span>
       </div>
-      <span className="product-stock">В наличии: {quantity} шт.</span>
+      <span className={`product-stock ${isOutOfStock ? 'out-of-stock' : ''}`}>
+        {isOutOfStock ? 'Нет в наличии' : `В наличии: ${quantity} шт.`}
+      </span>
       <button
-        className="add-to-basket-button"
+        className={`add-to-basket-button ${isOutOfStock ? 'disabled' : ''}`}
         onClick={(e) => {
           e.stopPropagation();
-          handleAddToBasket({
-            image,
-            title,
-            price,
-            id,
-            availableQuantity: quantity
-          });
+          if (!isOutOfStock) {
+            handleAddToBasket({
+              image,
+              title,
+              price,
+              id,
+              availableQuantity: quantity
+            });
+          }
         }}
-        disabled={quantity === 0}
+        disabled={isOutOfStock}
       >
-        {quantity === 0 ? 'Нет в наличии' : 'Добавить в корзину'}
+        {isOutOfStock ? 'Нет в наличии' : 'Добавить в корзину'}
       </button>
     </div>
   );

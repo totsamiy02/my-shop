@@ -279,3 +279,12 @@
         gap: 10px;
     }
 }
+
+.product-stock.out-of-stock {
+  color: #ff0000;
+}
+
+.add-to-basket-button.disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}

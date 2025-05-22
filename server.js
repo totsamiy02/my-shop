@@ -10,6 +10,8 @@ const crypto = require('crypto');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const { sendOrderNotification } = require('./telegramBot');
+const { startBot } = require('./telegramBot');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -130,9 +132,27 @@ function authenticateToken(req, res, next) {
     
     if (!token) return res.sendStatus(401);
     
-    jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
-        if (err) return res.sendStatus(403);
-        req.user = user;
+    jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, decoded) => {
+        if (err) {
+            console.error('JWT verification error:', err);
+            return res.sendStatus(403);
+        }
+        
+        // Универсальное решение - поддерживаем оба варианта
+        const userId = decoded.userId || decoded.id;
+        
+        if (!userId) {
+            console.error('Invalid token data:', decoded);
+            return res.sendStatus(403);
+        }
+        
+        // Добавляем user в запрос с универсальными полями
+        req.user = {
+            id: userId,
+            userId: userId,  // Дублируем для совместимости
+            role: decoded.role
+        };
+        
         next();
     });
 }
@@ -210,38 +230,86 @@ app.post('/api/login', authLimiter, async (req, res) => {
     try {
         const { email, password } = req.body;
         
+        // Валидация входных данных
+        if (!email || !password) {
+            return res.status(400).json({ 
+                error: 'Необходимо указать email и пароль',
+                details: {
+                    email: !email ? 'Требуется email' : null,
+                    password: !password ? 'Требуется пароль' : null
+                }
+            });
+        }
+
         db.get(
-            `SELECT * FROM users WHERE email = ?`,
+            `SELECT 
+                id, 
+                first_name, 
+                last_name, 
+                email, 
+                password, 
+                role, 
+                avatar, 
+                failed_login_attempts, 
+                last_failed_login 
+            FROM users 
+            WHERE email = ?`,
             [email],
             async (err, user) => {
                 if (err) {
-                    return res.status(500).json({ error: 'Ошибка сервера' });
-                }
-                
-                if (!user) {
-                    return res.status(401).json({ error: 'Неверный email или пароль' });
-                }
-                
-                if (user.failed_login_attempts >= 6 && 
-                    Date.now() - user.last_failed_login < 60000) {
-                    return res.status(429).json({ 
-                        error: 'Слишком много неудачных попыток. Попробуйте через минуту.' 
+                    console.error('Ошибка базы данных при входе:', err);
+                    return res.status(500).json({ 
+                        error: 'Ошибка сервера',
+                        details: 'Database query failed'
                     });
                 }
                 
+                if (!user) {
+                    return res.status(401).json({ 
+                        error: 'Неверные учетные данные',
+                        details: 'Пользователь с таким email не найден'
+                    });
+                }
+                
+                // Проверка блокировки после неудачных попыток
+                const isBlocked = user.failed_login_attempts >= 5 && 
+                                Date.now() - user.last_failed_login < 300000; // 5 минут блокировки
+                
+                if (isBlocked) {
+                    const timeLeft = Math.ceil((300000 - (Date.now() - user.last_failed_login)) / 1000);
+                    return res.status(429).json({ 
+                        error: 'Слишком много неудачных попыток',
+                        details: `Попробуйте через ${timeLeft} секунд`,
+                        retryAfter: timeLeft
+                    });
+                }
+                
+                // Проверка пароля
                 const isMatch = await bcrypt.compare(password, user.password);
                 
                 if (!isMatch) {
+                    // Обновляем счетчик неудачных попыток
                     db.run(
                         `UPDATE users SET 
                         failed_login_attempts = failed_login_attempts + 1,
                         last_failed_login = ?
                         WHERE id = ?`,
-                        [Date.now(), user.id]
+                        [Date.now(), user.id],
+                        function(err) {
+                            if (err) {
+                                console.error('Ошибка при обновлении счетчика попыток:', err);
+                            }
+                        }
                     );
-                    return res.status(401).json({ error: 'Неверный email или пароль' });
+                    
+                    return res.status(401).json({ 
+                        error: 'Неверные учетные данные',
+                        details: 'Неправильный пароль',
+                        attemptsLeft: 5 - user.failed_login_attempts
+                    });
                 }
                 
+                // Сброс счетчика при успешном входе
                 db.run(
                     `UPDATE users SET 
                     failed_login_attempts = 0,
@@ -250,26 +318,42 @@ app.post('/api/login', authLimiter, async (req, res) => {
                     [user.id]
                 );
                 
+                // Генерация токена с дополнительными данными для совместимости
                 const token = jwt.sign(
-                    { userId: user.id, role: user.role },
+                    { 
+                        userId: user.id,  // Основной идентификатор
+                        id: user.id,      // Для обратной совместимости
+                        role: user.role,
+                        email: user.email,
+                        firstName: user.first_name,
+                        lastName: user.last_name
+                    },
                     process.env.JWT_SECRET || 'your-secret-key',
                     { expiresIn: '1h' }
                 );
                 
+                // Формирование ответа
                 res.json({ 
+                    success: true,
                     token, 
                     user: {
                         id: user.id,
                         firstName: user.first_name,
                         lastName: user.last_name,
+                        email: user.email,
                         role: user.role,
-                        avatar: user.avatar
-                    } 
+                        avatar: user.avatar || '/img/avatar.jpg'
+                    },
+                    tokenExpiresIn: 3600 // 1 час в секундах
                 });
             }
         );
     } catch (error) {
-        res.status(500).json({ error: 'Ошибка сервера' });
+        console.error('Ошибка в обработчике входа:', error);
+        res.status(500).json({ 
+            error: 'Внутренняя ошибка сервера',
+            details: error.message
+        });
     }
 });
 
@@ -553,9 +637,10 @@ app.get('/api/user/check-phone', authenticateToken, (req, res) => {
 app.get('/api/user', authenticateToken, (req, res) => {
     db.get(
         `SELECT id, first_name, last_name, email, phone, role, avatar FROM users WHERE id = ?`,
-        [req.user.userId],
+        [req.user.userId],  // Используем userId
         (err, user) => {
             if (err) {
+                console.error('Database error:', err);
                 return res.status(500).json({ error: 'Ошибка сервера' });
             }
             
@@ -947,6 +1032,364 @@ app.get('/api/admin/categories', authenticateToken, (req, res) => {
     );
 });
 
+// Роуты для корзины
+const cartRouter = express.Router();
+
+// Получить содержимое корзины
+cartRouter.get('/', authenticateToken, (req, res) => {
+    const userId = req.user.id;
+    
+    db.all(`
+        SELECT ci.id, ci.quantity, 
+               p.id as product_id, p.name, p.price, p.image, p.quantity as max_quantity
+        FROM cart_items ci
+        JOIN products p ON ci.product_id = p.id
+        WHERE ci.user_id = ?
+    `, [userId], (err, items) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Ошибка при получении корзины' });
+        }
+        
+        res.json(items);
+    });
+});
+
+// Добавить товар в корзину
+cartRouter.post('/add', authenticateToken, async (req, res) => {
+    const { productId } = req.body;
+    
+    // Универсальное получение ID пользователя (поддерживает оба варианта)
+    const userId = req.user.id || req.user.userId;
+    
+    // Валидация входных данных
+    if (!productId || isNaN(productId)) {
+        return res.status(400).json({ 
+            error: 'Неверный ID товара',
+            details: 'productId должен быть числом'
+        });
+    }
+
+    if (!userId) {
+        return res.status(401).json({
+            error: 'Пользователь не идентифицирован',
+            details: 'Токен не содержит userID'
+        });
+    }
+
+    try {
+        // 1. Проверяем существование товара
+        const product = await new Promise((resolve, reject) => {
+            db.get(`
+                SELECT id, quantity as maxQuantity 
+                FROM products 
+                WHERE id = ?
+            `, [productId], (err, row) => {
+                if (err) {
+                    console.error('Ошибка при проверке товара:', err);
+                    reject(new Error('Ошибка базы данных'));
+                } else {
+                    resolve(row);
+                }
+            });
+        });
+
+        if (!product) {
+            return res.status(404).json({ 
+                error: 'Товар не найден',
+                productId
+            });
+        }
+
+        // 2. Проверяем наличие товара в корзине
+        const cartItem = await new Promise((resolve, reject) => {
+            db.get(`
+                SELECT id, quantity 
+                FROM cart_items 
+                WHERE user_id = ? AND product_id = ?
+            `, [userId, productId], (err, row) => {
+                if (err) {
+                    console.error('Ошибка при проверке корзины:', err);
+                    reject(new Error('Ошибка базы данных'));
+                } else {
+                    resolve(row);
+                }
+            });
+        });
+
+        let result;
+        if (cartItem) {
+            // 3. Проверяем доступное количество
+            if (cartItem.quantity >= product.maxQuantity) {
+                return res.status(400).json({
+                    error: 'Достигнуто максимальное количество',
+                    maxQuantity: product.maxQuantity,
+                    currentQuantity: cartItem.quantity
+                });
+            }
+
+            // 4. Обновляем количество существующего товара
+            result = await new Promise((resolve, reject) => {
+                db.run(`
+                    UPDATE cart_items 
+                    SET quantity = quantity + 1 
+                    WHERE id = ?
+                `, [cartItem.id], function(err) {
+                    if (err) {
+                        console.error('Ошибка обновления корзины:', err);
+                        reject(new Error('Ошибка базы данных'));
+                    } else {
+                        resolve({ 
+                            quantity: cartItem.quantity + 1,
+                            action: 'updated' 
+                        });
+                    }
+                });
+            });
+        } else {
+            // 5. Добавляем новый товар в корзину
+            result = await new Promise((resolve, reject) => {
+                db.run(`
+                    INSERT INTO cart_items 
+                    (user_id, product_id, quantity) 
+                    VALUES (?, ?, 1)
+                `, [userId, productId], function(err) {
+                    if (err) {
+                        console.error('Ошибка добавления в корзину:', err);
+                        reject(new Error('Ошибка базы данных'));
+                    } else {
+                        resolve({ 
+                            quantity: 1,
+                            action: 'added' 
+                        });
+                    }
+                });
+            });
+        }
+
+        // 6. Возвращаем успешный ответ
+        res.json({ 
+            success: true,
+            productId,
+            userId,
+            ...result
+        });
+
+    } catch (error) {
+        console.error('Ошибка в обработчике корзины:', error);
+        
+        res.status(500).json({ 
+            error: 'Внутренняя ошибка сервера',
+            details: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// Обновить количество товара в корзине
+cartRouter.put('/update', authenticateToken, (req, res) => {
+    const { productId, quantity } = req.body;
+    const userId = req.user.id;
+    
+    if (!productId || quantity === undefined) {
+        return res.status(400).json({ error: 'Не указаны ID товара или количество' });
+    }
+    
+    if (quantity < 1) {
+        return res.status(400).json({ error: 'Количество должно быть не менее 1' });
+    }
+    
+    // 1. Проверяем доступное количество товара
+    db.get('SELECT quantity FROM products WHERE id = ?', [productId], (err, product) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Ошибка при проверке товара' });
+        }
+        
+        if (!product) {
+            return res.status(404).json({ error: 'Товар не найден' });
+        }
+        
+        if (quantity > product.quantity) {
+            return res.status(400).json({ 
+                error: 'Запрошенное количество превышает доступное', 
+                maxQuantity: product.quantity 
+            });
+        }
+        
+        // 2. Обновляем количество в корзине
+        db.run(
+            `UPDATE cart_items 
+             SET quantity = ?, 
+                 updated_at = CURRENT_TIMESTAMP 
+             WHERE user_id = ? AND product_id = ?`,
+            [quantity, userId, productId],
+            function(err) {
+                if (err) {
+                    console.error(err);
+                    return res.status(500).json({ error: 'Ошибка при обновлении корзины' });
+                }
+                
+                if (this.changes === 0) {
+                    return res.status(404).json({ error: 'Товар не найден в корзине' });
+                }
+                
+                res.json({ success: true });
+            }
+        );
+    });
+});
+
+// Удалить товар из корзины
+cartRouter.delete('/remove', authenticateToken, (req, res) => {
+    const { productId } = req.body;
+    const userId = req.user.id;
+    
+    if (!productId) {
+        return res.status(400).json({ error: 'Не указан ID товара' });
+    }
+    
+    db.run(
+        'DELETE FROM cart_items WHERE user_id = ? AND product_id = ?',
+        [userId, productId],
+        function(err) {
+            if (err) {
+                console.error(err);
+                return res.status(500).json({ error: 'Ошибка при удалении из корзины' });
+            }
+            
+            if (this.changes === 0) {
+                return res.status(404).json({ error: 'Товар не найден в корзине' });
+            }
+            
+            res.json({ success: true });
+        }
+    );
+});
+
+// Очистить корзину
+cartRouter.delete('/clear', authenticateToken, (req, res) => {
+    const userId = req.user.id;
+    
+    db.run(
+        'DELETE FROM cart_items WHERE user_id = ?',
+        [userId],
+        function(err) {
+            if (err) {
+                console.error(err);
+                return res.status(500).json({ error: 'Ошибка при очистке корзины' });
+            }
+            
+            res.json({ 
+                success: true, 
+                deletedCount: this.changes 
+            });
+        }
+    );
+});
+
+// Подключаем роуты корзины
+app.use('/api/cart', cartRouter);
+
+
+// Роуты для заказов
+app.post('/api/orders/checkout', authenticateToken, async (req, res) => {
+  try {
+    const { formData, basket, totalAmount } = req.body;
+    const userId = req.user.id;
+
+    // 1. Сохраняем заказ в БД
+    const orderId = await new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO orders (
+          user_id, total_amount, status,
+          first_name, last_name, address,
+          email, phone, payment_method
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          userId,
+          totalAmount,
+          'processing',
+          formData.firstName,
+          formData.lastName,
+          formData.address,
+          formData.email,
+          formData.phone.replace(/\D/g, ''),
+          formData.paymentMethod
+        ],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this.lastID);
+        }
+      );
+    });
+
+    // 2. Сохраняем товары заказа
+    await Promise.all(basket.map(item => {
+      return new Promise((resolve, reject) => {
+        db.run(
+          `INSERT INTO order_items (
+            order_id, product_id, quantity, price
+          ) VALUES (?, ?, ?, ?)`,
+          [orderId, item.product_id, item.quantity, item.price],
+          (err) => {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      });
+    }));
+
+    // 3. Отправляем уведомление в Telegram
+    let telegramSent = false;
+    try {
+      telegramSent = await sendOrderNotification({
+        orderId,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
+        address: formData.address,
+        basket: basket.map(item => ({
+          title: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          image: item.image || null
+        })),
+        totalAmount,
+        paymentMethod: formData.paymentMethod
+      });
+    } catch (tgError) {
+      console.error('Ошибка Telegram:', tgError);
+    }
+
+    // 4. Очищаем корзину
+    await new Promise((resolve, reject) => {
+      db.run(
+        'DELETE FROM cart_items WHERE user_id = ?',
+        [userId],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
+
+    res.json({ 
+      success: true,
+      orderId,
+      telegramNotification: telegramSent
+    });
+
+  } catch (error) {
+    console.error('Ошибка оформления заказа:', error);
+    res.status(500).json({ 
+      error: 'Ошибка при оформлении заказа',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+
 const favoritesRoutes = require('./src/routes/favoritesRoutes');
 app.use('/api/favorites', (req, res, next) => {
     req.db = db; // Передаем экземпляр базы данных
@@ -973,8 +1416,8 @@ app.use((err, req, res, next) => {
 // Запуск сервера
 app.listen(port, () => {
     console.log(`Сервер запущен на http://localhost:${port}`);
-    require('./telegramBot'); // Запускаем бота
-    
+    startBot(); // Запускаем бота
+
     // Создаем необходимые папки при запуске
     const foldersToCreate = ['uploads', 'public/img'];
     foldersToCreate.forEach(folder => {

@@ -6,6 +6,8 @@ import ProductModal from '../card/modal/ProductModal';
 import usePagination from '../hook/usePagination';
 import SearchWithFilters from '../SearchBar/SearchWithFilters';
 import '../card/ProductCard.css';
+import { useAuth } from '../hook/AuthContext';
+import { useBasket } from '../hook/useBasket';
 
 function ProductList() {
     const { t } = useTranslation();
@@ -16,11 +18,9 @@ function ProductList() {
     const [showNotification, setShowNotification] = useState(false);
     const [notificationProductName, setNotificationProductName] = useState('');
     const [selectedProduct, setSelectedProduct] = useState(null);
-    const [basket, setBasket] = useState(() => {
-        const savedBasket = localStorage.getItem('basket');
-        return savedBasket ? JSON.parse(savedBasket) : [];
-    });
     const [initialLoad, setInitialLoad] = useState(true);
+    const { isAuthenticated } = useAuth();
+    const { addToBasket } = useBasket();
 
     const {
         currentPage,
@@ -42,8 +42,8 @@ function ProductList() {
             }
             const data = await response.json();
             setProducts(data);
-            setFilteredProducts(data); // Устанавливаем данные без фильтрации
-            setInitialLoad(false); // Помечаем что первоначальная загрузка завершена
+            setFilteredProducts(data);
+            setInitialLoad(false);
         } catch (error) {
             console.error(error);
             setError(error.message);
@@ -57,18 +57,11 @@ function ProductList() {
         fetchProducts();
     }, []);
 
-    useEffect(() => {
-        if (!initialLoad && products.length > 0) {
-            localStorage.setItem('basket', JSON.stringify(basket));
-        }
-    }, [basket, initialLoad]);
-
     const handleFiltersChange = (filters) => {
-        if (initialLoad) return; // Не применяем фильтры пока идет первоначальная загрузка
+        if (initialLoad) return;
 
-        let filtered = [...products]; // Создаем копию всех товаров
+        let filtered = [...products];
         
-        // Применяем фильтры только если они заданы
         if (filters.query) {
             filtered = filtered.filter(p => 
                 p.name.toLowerCase().includes(filters.query.toLowerCase())
@@ -83,7 +76,6 @@ function ProductList() {
             filtered = filtered.filter(p => p.category_id == filters.category);
         }
 
-        // Сортировка применяется только если явно выбрана
         if (filters.priceSort === 'asc') {
             filtered.sort((a, b) => a.price - b.price);
         } else if (filters.priceSort === 'desc') {
@@ -94,39 +86,38 @@ function ProductList() {
         goToPage(1);
     };
 
-    // Остальные методы остаются без изменений
-    const handleAddToBasket = (product) => {
+    const handleAddToBasket = async (product) => {
+        if (!isAuthenticated) {
+            window.dispatchEvent(new CustomEvent('openAuthModal', {
+                detail: { mode: 'login' }
+            }));
+            return;
+        }
+
         const productInDb = products.find(p => p.id === product.id);
-        if (!productInDb || productInDb.quantity <= 0) return;
+        if (!productInDb || productInDb.quantity <= 0) {
+            setNotificationProductName(product.name || product.title);
+            setShowNotification(true);
+            setTimeout(() => setShowNotification(false), 3000);
+            return;
+        }
 
-        setBasket(prevBasket => {
-            const existingProduct = prevBasket.find(item => item.id === product.id);
-
-            if (existingProduct) {
-                if (existingProduct.quantity >= productInDb.quantity) {
-                    alert(t('product_list.max_quantity', { quantity: productInDb.quantity }));
-                    return prevBasket;
-                }
-                return prevBasket.map(item =>
-                    item.id === product.id
-                        ? { ...item, quantity: item.quantity + 1 }
-                        : item
-                );
+        try {
+            await addToBasket(product.id);
+            setNotificationProductName(product.name || product.title);
+            setShowNotification(true);
+            setTimeout(() => setShowNotification(false), 3000);
+        } catch (error) {
+            console.error('Ошибка при добавлении в корзину:', error);
+            if (error.message.includes('Достигнуто максимальное количество')) {
+                alert(t('product_list.max_quantity', { quantity: productInDb.quantity }));
+            } else {
+                alert(error.message || 'Ошибка при добавлении в корзину');
             }
-            return [...prevBasket, {
-                ...product,
-                quantity: 1,
-                maxQuantity: productInDb.quantity
-            }];
-        });
-
-        setNotificationProductName(product.name || product.title);
-        setShowNotification(true);
-        setTimeout(() => setShowNotification(false), 3000);
+        }
     };
 
     const handleOrderComplete = () => {
-        setBasket([]);
         fetchProducts();
     };
 
@@ -215,6 +206,7 @@ function ProductList() {
                     product={selectedProduct}
                     onClose={() => setSelectedProduct(null)}
                     onAddToCart={handleAddToBasket}
+                    onOrderComplete={handleOrderComplete}
                 />
             )}
         </div>

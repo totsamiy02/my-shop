@@ -1,19 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import '../index.css';
-import './basket.css';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hook/AuthContext';
+import { useBasket } from '../hook/useBasket';
 import Header from '../header/header';
 import Footer from '../footer/footer';
-import { useNavigate } from 'react-router-dom';
 import cartImage from '../img/Иллюстрация.svg';
 import CheckoutModal from './CheckoutModal/CheckoutModal';
+import Notification from '../Notification/Notification';
+import '../index.css';
+import './basket.css';
 
 function Basket() {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const [basket, setBasket] = useState([]);
-    const [products, setProducts] = useState([]);
-    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+    const { isAuthenticated } = useAuth();
+    const { 
+        basket, 
+        isLoading, 
+        error, 
+        updateBasketItem, 
+        removeFromBasket, 
+        clearBasket,
+        fetchBasket
+    } = useBasket();
+    
     const [formData, setFormData] = useState({
         firstName: '',
         lastName: '',
@@ -27,41 +38,27 @@ function Basket() {
         cardCVC: '',
     });
     const [formSuccess, setFormSuccess] = useState(false);
-    const [error, setError] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+    const [notification, setNotification] = useState({ show: false, message: '', duration: 3000 });
 
     useEffect(() => {
-        const loadData = async () => {
-            try {
-                const savedBasket = JSON.parse(localStorage.getItem('basket')) || [];
-                setBasket(savedBasket);
-
-                const response = await fetch('/api/products');
-                if (!response.ok) {
-                    throw new Error(t('basket.load_products_error'));
+        if (!isAuthenticated) {
+            setNotification({
+                show: true,
+                message: 'Для просмотра корзины необходимо авторизоваться',
+                duration: 3000
+            });
+            
+            window.dispatchEvent(new CustomEvent('openAuthModal', {
+                detail: { 
+                    mode: 'login',
+                    returnUrl: '/basket'
                 }
-                
-                const data = await response.json();
-                setProducts(data);
-                
-                const updatedBasket = savedBasket.map(item => {
-                    const product = data.find(p => p.name === item.title);
-                    return {
-                        ...item,
-                        maxQuantity: product ? product.quantity : 0
-                    };
-                });
-                
-                setBasket(updatedBasket);
-                localStorage.setItem('basket', JSON.stringify(updatedBasket));
-            } catch (error) {
-                console.error(t('basket.load_error'), error);
-                setError(t('basket.load_error_message'));
-            }
-        };
-
-        loadData();
-    }, [t]);
+            }));
+            
+            navigate('/');
+        }
+    }, [isAuthenticated, navigate]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -78,114 +75,211 @@ function Basket() {
         if (basket.length === 0) {
             return t('basket.validation.empty_basket');
         }
+        
+        const outOfStockItems = basket.filter(item => item.max_quantity <= 0);
+        if (outOfStockItems.length > 0) {
+            return 'Некоторые товары в корзине отсутствуют на складе';
+        }
+        
         return null;
     };
 
     const handleCheckoutSubmit = async (e) => {
-        e.preventDefault();
-        
-        const validationError = validateForm();
-        if (validationError) {
-            alert(validationError);
-            return;
-        }
-      
-        try {
-            setIsLoading(true);
-            const cleanedPhone = formData.phone.replace(/\D/g, '');
-            
-            const response = await fetch('/api/orders/checkout', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    formData: {
-                        ...formData,
-                        phone: cleanedPhone
-                    },
-                    basket: basket.map(item => ({
-                        title: item.title,
-                        price: item.price,
-                        quantity: item.quantity
-                    })),
-                    totalAmount
-                }),
-            });
-        
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || t('basket.server_error'));
-            }
-        
-            setBasket([]);
-            localStorage.setItem('basket', JSON.stringify([]));
-            setFormSuccess(true);
-            
-        } catch (error) {
-            console.error(t('basket.checkout_error'), error);
-            setError(error.message);
-        } finally {
-            setIsLoading(false);
-        }
+  e.preventDefault();
+  
+  const validationError = validateForm();
+  if (validationError) {
+    setNotification({
+      show: true,
+      message: validationError,
+      duration: 3000
+    });
+    return;
+  }
+
+  try {
+    const cleanedPhone = formData.phone.replace(/\D/g, '');
+    const orderData = {
+      formData: {
+        ...formData,
+        phone: cleanedPhone
+      },
+      basket: basket.map(item => ({
+        product_id: item.product_id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        image: item.image // Добавьте это поле, если есть
+      })),
+      totalAmount
     };
+
+    const response = await fetch('/api/orders/checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify(orderData)
+    });
+
+    const result = await response.json();
+    
+    if (result.success) {
+      setNotification({
+        show: true,
+        message: `Заказ #${result.orderId} оформлен! ${result.telegramNotification ? 'Чек отправлен в Telegram.' : ''}`,
+        duration: 5000
+      });
+      await clearBasket();
+      setIsCheckoutOpen(false);
+    } else {
+      throw new Error('Ошибка оформления заказа');
+    }
+  } catch (error) {
+    setNotification({
+      show: true,
+      message: error.message || 'Ошибка при оформлении заказа',
+      duration: 5000
+    });
+  }
+};
 
     const handleGoToCatalog = () => {
         navigate('/');
     };
 
-    const removeProduct = (productId) => {
-        const updatedBasket = basket.filter(item => item.id !== productId);
-        setBasket(updatedBasket);
-        localStorage.setItem('basket', JSON.stringify(updatedBasket));
-    };
-
-    const updateQuantity = (productId, newQuantity) => {
-        const updatedBasket = basket.map(item => {
-            if (item.id === productId) {
-                const quantity = Math.max(1, Math.min(newQuantity, item.maxQuantity));
-                return { ...item, quantity };
-            }
-            return item;
-        });
-        setBasket(updatedBasket);
-        localStorage.setItem('basket', JSON.stringify(updatedBasket));
-    };
-
-    const handleQuantityChange = (productId, e) => {
+    const handleQuantityChange = async (productId, e) => {
         const value = parseInt(e.target.value) || 1;
-        updateQuantity(productId, value);
+        const item = basket.find(i => i.product_id === productId);
+        
+        if (!item) return;
+        
+        let newQuantity = value;
+        if (newQuantity > item.max_quantity) {
+            newQuantity = item.max_quantity;
+        } else if (newQuantity < 1) {
+            newQuantity = 1;
+        }
+        
+        try {
+            await updateBasketItem(productId, newQuantity);
+        } catch (error) {
+            setNotification({
+                show: true,
+                message: error.message,
+                duration: 3000
+            });
+        }
     };
 
-    const incrementQuantity = (productId) => {
-        const item = basket.find(i => i.id === productId);
-        if (item) updateQuantity(productId, item.quantity + 1);
+    const incrementQuantity = async (productId) => {
+        const item = basket.find(i => i.product_id === productId);
+        if (item && item.quantity < item.max_quantity) {
+            try {
+                await updateBasketItem(productId, item.quantity + 1);
+            } catch (error) {
+                setNotification({
+                    show: true,
+                    message: error.message,
+                    duration: 3000
+                });
+            }
+        }
     };
 
-    const decrementQuantity = (productId) => {
-        const item = basket.find(i => i.id === productId);
-        if (item) updateQuantity(productId, item.quantity - 1);
+    const decrementQuantity = async (productId) => {
+        const item = basket.find(i => i.product_id === productId);
+        if (item && item.quantity > 1) {
+            try {
+                await updateBasketItem(productId, item.quantity - 1);
+            } catch (error) {
+                setNotification({
+                    show: true,
+                    message: error.message,
+                    duration: 3000
+                });
+            }
+        }
     };
 
-    const totalAmount = Math.floor(
-        basket.reduce((sum, item) => {
-            const itemTotal = Number(item.price) * Number(item.quantity);
-            return sum + (isNaN(itemTotal) ? 0 : itemTotal);
-        }, 0)
-    );
+    const removeProduct = async (productId) => {
+        try {
+            await removeFromBasket(productId);
+            setNotification({
+                show: true,
+                message: 'Товар удален из корзины',
+                duration: 3000
+            });
+        } catch (error) {
+            setNotification({
+                show: true,
+                message: error.message,
+                duration: 3000
+            });
+        }
+    };
+
+    const totalAmount = basket.reduce((sum, item) => {
+        return sum + (item.price * item.quantity);
+    }, 0);
+
+    const hasOutOfStockItems = basket.some(item => item.max_quantity <= 0);
+
+    if (!isAuthenticated) {
+        return (
+            <div className="auth-required-container">
+                <Header />
+                <div className="auth-required-message">
+                    <h2>Доступ ограничен</h2>
+                    <p>Для просмотра корзины необходимо авторизоваться</p>
+                    <button
+                        className="auth-button"
+                        onClick={() => window.dispatchEvent(new CustomEvent('openAuthModal', {
+                            detail: { mode: 'login' }
+                        }))}
+                    >
+                        Войти
+                    </button>
+                    <button 
+                        className="catalog-button"
+                        onClick={handleGoToCatalog}
+                    >
+                        Вернуться в каталог
+                    </button>
+                </div>
+                <Footer />
+            </div>
+        );
+    }
 
     return (
         <div className="basket-page">
             <Header />
             <div className="cart-section container">
-                {error && (
-                    <div className="error-message">
-                        {error}
-                        <button onClick={() => setError(null)}>×</button>
-                    </div>
-                )}
+                <Notification 
+                    message={notification.message} 
+                    show={notification.show} 
+                    duration={notification.duration}
+                    onClose={() => setNotification({...notification, show: false})} 
+                />
 
-                {basket.length === 0 ? (
+                {isLoading && basket.length === 0 ? (
+                    <div className="loading-container">
+                        <div className="loading-spinner"></div>
+                        <p>{t('basket.loading')}</p>
+                    </div>
+                ) : error ? (
+                    <div className="error-message">
+                        <p>{error}</p>
+                        <button 
+                            onClick={fetchBasket}
+                            className="retry-button"
+                        >
+                            {t('basket.retry')}
+                        </button>
+                    </div>
+                ) : basket.length === 0 ? (
                     <div className="cart-empty-section">
                         <div className="cart-image-container">
                             <img 
@@ -205,44 +299,50 @@ function Basket() {
                     </div>
                 ) : (
                     <div className="cart-items-container">
+                        {hasOutOfStockItems && (
+                            <div className="out-of-stock-warning">
+                                Некоторые товары в корзине отсутствуют на складе. Пожалуйста, удалите их для оформления заказа.
+                            </div>
+                        )}
                         <div className="cart-items">
                             {basket.map(item => (
-                                <div key={item.id} className="cart-item">
+                                <div key={item.id} className={`cart-item ${item.max_quantity <= 0 ? 'out-of-stock' : ''}`}>
                                     <figure className="cart-item-image-container">
-                                        <img src={item.image} alt={item.title} className="cart-item-image" />
+                                        <img src={item.image} alt={item.name} className="cart-item-image" />
                                     </figure>
                                     <div className="cart-item-info">
-                                        <h3 className="cart-item-name">{item.title}</h3>
-                                        <span className="cart-item-price">{Math.floor(item.price)}₽</span>
-                                        <span className="cart-item-stock">
-                                            {t('basket.available')}: {item.maxQuantity} {t('basket.pcs')} | {t('basket.in_cart')}: {item.quantity} {t('basket.pcs')}
+                                        <h3 className="cart-item-name">{item.name}</h3>
+                                        <span className="cart-item-price">{item.price}₽</span>
+                                        <span className={`cart-item-stock ${item.max_quantity <= 0 ? 'out-of-stock' : ''}`}>
+                                            {item.max_quantity <= 0 ? 'Нет в наличии' : `В наличии: ${item.max_quantity} шт.`} | {t('basket.in_cart')}: {item.quantity} {t('basket.pcs')}
                                         </span>
                                         <div className="cart-item-quantity">
                                             <button 
-                                                onClick={() => decrementQuantity(item.id)}
+                                                onClick={() => decrementQuantity(item.product_id)}
                                                 className="quantity-button"
-                                                disabled={item.quantity <= 1}
+                                                disabled={item.quantity <= 1 || item.max_quantity <= 0}
                                             >
                                                 -
                                             </button>
                                             <input
                                                 type="number"
                                                 min="1"
-                                                max={item.maxQuantity}
+                                                max={item.max_quantity}
                                                 value={item.quantity}
-                                                onChange={(e) => handleQuantityChange(item.id, e)}
+                                                onChange={(e) => handleQuantityChange(item.product_id, e)}
                                                 className="quantity-input"
+                                                disabled={item.max_quantity <= 0}
                                             />
                                             <button 
-                                                onClick={() => incrementQuantity(item.id)}
+                                                onClick={() => incrementQuantity(item.product_id)}
                                                 className="quantity-button"
-                                                disabled={item.quantity >= item.maxQuantity}
+                                                disabled={item.quantity >= item.max_quantity || item.max_quantity <= 0}
                                             >
                                                 +
                                             </button>
                                         </div>
                                         <button 
-                                            onClick={() => removeProduct(item.id)}
+                                            onClick={() => removeProduct(item.product_id)}
                                             className="remove-button"
                                         >
                                             {t('basket.remove')}
@@ -259,7 +359,7 @@ function Basket() {
                             <button 
                                 className="checkout-button"
                                 onClick={() => setIsCheckoutOpen(true)}
-                                disabled={basket.length === 0}
+                                disabled={basket.length === 0 || isLoading || hasOutOfStockItems}
                             >
                                 {t('basket.checkout')}
                             </button>
@@ -281,7 +381,6 @@ function Basket() {
                 isCheckoutOpen={isCheckoutOpen}
                 setIsCheckoutOpen={setIsCheckoutOpen}
                 formSuccess={formSuccess}
-                error={error}
                 isLoading={isLoading}
                 t={t}
             />
