@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import './SearchWithFilters.css';
 
-function SearchWithFilters({ onFiltersChange }) {
+function SearchWithFilters({ onFiltersChange, disabled = false }) {
     const { t } = useTranslation();
     const [query, setQuery] = useState('');
     const [showHistory, setShowHistory] = useState(false);
@@ -11,8 +11,14 @@ function SearchWithFilters({ onFiltersChange }) {
     const [priceRange, setPriceRange] = useState([0, 10000]);
     const [selectedCategory, setSelectedCategory] = useState('');
     const [categories, setCategories] = useState([]);
-    const [priceSort, setPriceSort] = useState('asc');
+    const [priceSort, setPriceSort] = useState('none');
+    const [isDisabled, setIsDisabled] = useState(disabled);
     const inputRef = useRef(null);
+    const isInitialMount = useRef(true);
+
+    useEffect(() => {
+        setIsDisabled(disabled);
+    }, [disabled]);
 
     useEffect(() => {
         const history = JSON.parse(localStorage.getItem('searchHistory') || '[]');
@@ -25,6 +31,13 @@ function SearchWithFilters({ onFiltersChange }) {
     }, [t]);
 
     useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+
+        if (isDisabled) return;
+
         const timer = setTimeout(() => {
             applyFilters({
                 query,
@@ -36,19 +49,25 @@ function SearchWithFilters({ onFiltersChange }) {
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [query, priceRange, selectedCategory, priceSort]);
+    }, [query, priceRange, selectedCategory, priceSort, isDisabled]);
 
     const applyFilters = (filters) => {
-        if (onFiltersChange) {
+        if (onFiltersChange && !isDisabled) {
             onFiltersChange(filters);
         }
     };
 
     const togglePriceSort = () => {
-        setPriceSort(prev => prev === 'asc' ? 'desc' : 'asc');
+        if (isDisabled) return;
+        setPriceSort(prev => {
+            if (prev === 'none') return 'asc';
+            if (prev === 'asc') return 'desc';
+            return 'none';
+        });
     };
 
     const handleSearch = () => {
+        if (isDisabled) return;
         const trimmedQuery = query.trim();
         if (trimmedQuery) {
             const updatedHistory = [trimmedQuery, ...searchHistory.filter(item => item !== trimmedQuery)].slice(0, 5);
@@ -59,6 +78,7 @@ function SearchWithFilters({ onFiltersChange }) {
     };
 
     const handleFilterApply = () => {
+        if (isDisabled) return;
         applyFilters({
             query,
             minPrice: priceRange[0],
@@ -70,20 +90,22 @@ function SearchWithFilters({ onFiltersChange }) {
     };
 
     const resetAllFilters = () => {
+        if (isDisabled) return;
         setPriceRange([0, 10000]);
         setSelectedCategory('');
-        setPriceSort('asc');
+        setPriceSort('none');
         setQuery('');
         applyFilters({
             query: '',
             minPrice: 0,
             maxPrice: 10000,
             category: '',
-            priceSort: 'asc'
+            priceSort: 'none'
         });
     };
 
     const resetSearch = () => {
+        if (isDisabled) return;
         setQuery('');
         applyFilters({
             query: '',
@@ -95,6 +117,7 @@ function SearchWithFilters({ onFiltersChange }) {
     };
 
     const handleMinPriceChange = (e) => {
+        if (isDisabled) return;
         const value = e.target.value;
         if (value === '' || /^[0-9]+$/.test(value)) {
             const numValue = value === '' ? '' : Math.min(10000, parseInt(value, 10));
@@ -103,6 +126,7 @@ function SearchWithFilters({ onFiltersChange }) {
     };
 
     const handleMaxPriceChange = (e) => {
+        if (isDisabled) return;
         const value = e.target.value;
         if (value === '' || /^[0-9]+$/.test(value)) {
             const numValue = value === '' ? '' : Math.min(10000, parseInt(value, 10));
@@ -111,6 +135,7 @@ function SearchWithFilters({ onFiltersChange }) {
     };
 
     const handlePriceBlur = (isMin) => {
+        if (isDisabled) return;
         setPriceRange(prev => {
             const min = prev[0] === '' ? 0 : prev[0];
             const max = prev[1] === '' ? 10000 : prev[1];
@@ -119,7 +144,7 @@ function SearchWithFilters({ onFiltersChange }) {
     };
 
     return (
-        <div className="search-with-filters">
+        <div className={`search-with-filters ${isDisabled ? 'disabled' : ''}`}>
             <div className="search-bar">
                 <div className="search-input-container">
                     <input
@@ -131,12 +156,14 @@ function SearchWithFilters({ onFiltersChange }) {
                         onFocus={() => !filtersVisible && setShowHistory(true)}
                         onBlur={() => setTimeout(() => setShowHistory(false), 200)}
                         onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                        disabled={isDisabled}
                     />
                     {query && (
                         <button 
                             className="clear-search-button"
                             onClick={resetSearch}
                             aria-label={t('search_filters.clear_search')}
+                            disabled={isDisabled}
                         >
                             ×
                         </button>
@@ -145,10 +172,12 @@ function SearchWithFilters({ onFiltersChange }) {
                 <button 
                     className="filter-toggle"
                     onClick={() => {
+                        if (isDisabled) return;
                         setFiltersVisible(!filtersVisible);
                         setShowHistory(false);
                     }}
                     aria-label={t('search_filters.filters')}
+                    disabled={isDisabled}
                 >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                         <path d="M4 21V14" />
@@ -180,6 +209,7 @@ function SearchWithFilters({ onFiltersChange }) {
                                 aria-label={t('search_filters.min_price')}
                                 inputMode="numeric"
                                 placeholder="0"
+                                disabled={isDisabled}
                             />
                             <span>-</span>
                             <input
@@ -192,14 +222,24 @@ function SearchWithFilters({ onFiltersChange }) {
                                 aria-label={t('search_filters.max_price')}
                                 inputMode="numeric"
                                 placeholder="10000"
+                                disabled={isDisabled}
                             />
                             <button 
-                                className="compact-sort-button"
+                                className={`compact-sort-button ${priceSort !== 'none' ? 'active' : ''}`}
                                 onClick={togglePriceSort}
-                                aria-label={priceSort === 'asc' ? t('search_filters.sort_asc') : t('search_filters.sort_desc')}
-                                title={priceSort === 'asc' ? t('search_filters.sort_asc') : t('search_filters.sort_desc')}
+                                aria-label={
+                                    priceSort === 'asc' ? t('search_filters.sort_asc') : 
+                                    priceSort === 'desc' ? t('search_filters.sort_desc') : 
+                                    t('search_filters.sort_none')
+                                }
+                                title={
+                                    priceSort === 'asc' ? t('search_filters.sort_asc') : 
+                                    priceSort === 'desc' ? t('search_filters.sort_desc') : 
+                                    t('search_filters.sort_none')
+                                }
+                                disabled={isDisabled}
                             >
-                                {priceSort === 'asc' ? '↑' : '↓'}
+                                {priceSort === 'asc' ? '↑' : priceSort === 'desc' ? '↓' : '↕'}
                             </button>
                         </div>
                     </div>
@@ -210,6 +250,7 @@ function SearchWithFilters({ onFiltersChange }) {
                             value={selectedCategory}
                             onChange={(e) => setSelectedCategory(e.target.value)}
                             aria-label={t('search_filters.select_category')}
+                            disabled={isDisabled}
                         >
                             <option value="">{t('search_filters.all_categories')}</option>
                             {categories.map(cat => (
@@ -219,10 +260,18 @@ function SearchWithFilters({ onFiltersChange }) {
                     </div>
 
                     <div className="filter-actions">
-                        <button className="reset-button" onClick={resetAllFilters}>
+                        <button 
+                            className="reset-button" 
+                            onClick={resetAllFilters}
+                            disabled={isDisabled}
+                        >
                             {t('search_filters.reset_all')}
                         </button>
-                        <button className="apply-button" onClick={handleFilterApply}>
+                        <button 
+                            className="apply-button" 
+                            onClick={handleFilterApply}
+                            disabled={isDisabled}
+                        >
                             {t('search_filters.apply_filters')}
                         </button>
                     </div>
@@ -239,6 +288,7 @@ function SearchWithFilters({ onFiltersChange }) {
                                 setSearchHistory([]);
                             }}
                             aria-label={t('search_filters.clear_history')}
+                            disabled={isDisabled}
                         >
                             {t('search_filters.clear')}
                         </button>
@@ -247,10 +297,11 @@ function SearchWithFilters({ onFiltersChange }) {
                         <div 
                             key={i} 
                             onClick={() => { 
+                                if (isDisabled) return;
                                 setQuery(item); 
                                 inputRef.current.focus();
                             }}
-                            className="history-item"
+                            className={`history-item ${isDisabled ? 'disabled' : ''}`}
                         >
                             {item}
                         </div>

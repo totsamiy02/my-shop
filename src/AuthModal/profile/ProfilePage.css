@@ -1,3 +1,4 @@
+/* Основные стили */
 .profile-page {
     display: flex;
     flex-direction: column;
@@ -54,6 +55,7 @@
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
 }
 
+/* Стили для аватара */
 .profile-avatar-section {
     display: flex;
     flex-direction: column;
@@ -113,6 +115,7 @@
     color: #333;
 }
 
+/* Стили для информации профиля */
 .profile-info {
     display: grid;
     grid-template-columns: 1fr;
@@ -142,30 +145,29 @@
     font-weight: 500;
 }
 
-.profile-actions {
-    margin-top: 30px;
+/* Стили для телефона */
+.phone-display {
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
 }
 
-.edit-button {
-    background-color: transparent;
-    color: #ff6b00;
-    border: 2px solid #ff6b00;
-    padding: 10px 20px;
-    border-radius: 30px;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: all 0.3s;
+.phone-flag {
+    font-size: 1.2em;
+    line-height: 1;
 }
 
-.edit-button:hover {
-    background-color: #ff6b00;
-    color: white;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(255, 107, 0, 0.2);
+.phone-number {
+    font-size: 1.1rem;
 }
 
+.phone-warning {
+    color: #ff9800;
+    font-size: 0.9em;
+    margin-left: 8px;
+}
+
+/* Стили для форм */
 .form-group {
     display: flex;
     flex-direction: column;
@@ -192,6 +194,44 @@
     box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.2);
 }
 
+/* Стили для телефонного ввода */
+.phone-input {
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.phone-input:focus-within {
+    border-color: #ff6b00;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.2);
+}
+
+.PhoneInputCountry {
+    margin-right: 10px;
+}
+
+.PhoneInputInput {
+    border: none;
+    outline: none;
+    font-size: 1rem;
+    width: 100%;
+}
+
+.phone-error {
+    color: #ff3333;
+    font-size: 0.8rem;
+    margin-top: 5px;
+}
+
+.phone-input.invalid {
+    border-color: #ff3333;
+}
+
+/* Стили для формы пароля */
 .change-password-button {
     display: inline-flex;
     align-items: center;
@@ -263,6 +303,7 @@
     cursor: not-allowed;
 }
 
+/* Стили для кнопок действий */
 .form-actions {
     display: flex;
     gap: 15px;
@@ -303,6 +344,31 @@
     border-color: #ccc;
 }
 
+.edit-button {
+    background-color: transparent;
+    color: #ff6b00;
+    border: 2px solid #ff6b00;
+    padding: 10px 20px;
+    border-radius: 30px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.edit-button:hover {
+    background-color: #ff6b00;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(255, 107, 0, 0.2);
+}
+
+.profile-actions {
+    margin-top: 30px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Стили для загрузки */
 .loading-container {
     display: flex;
     flex-direction: column;
@@ -324,6 +390,15 @@
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* Отключение автозаполнения */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #333;
+    -webkit-box-shadow: 0 0 0px 1000px white inset;
+    transition: background-color 5000s ease-in-out 0s;
 }
 
 /* Адаптивные стили */
@@ -369,42 +444,4 @@
     .profile-container {
         padding: 20px 10px;
     }
-}
-
-/* Стили для телефонного ввода */
-.phone-input {
-    padding: 10px 15px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    font-size: 1rem;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.phone-input:focus-within {
-    border-color: #ff6b00;
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.2);
-}
-
-.PhoneInputCountry {
-    margin-right: 10px;
-}
-
-.PhoneInputInput {
-    border: none;
-    outline: none;
-    font-size: 1rem;
-    width: 100%;
-}
-
-.phone-error {
-    color: #ff3333;
-    font-size: 0.8rem;
-    margin-top: 5px;
-}
-
-/* Стиль для невалидного номера */
-.phone-input.invalid {
-    border-color: #ff3333;
 }

@@ -8,13 +8,18 @@ import ConfirmationModal from '../../Notification/ConfirmationModal.jsx';
 import './ProfilePage.css';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { isValidPhoneNumber } from 'react-phone-number-input';
+import { isValidPhoneNumber, parsePhoneNumber } from 'react-phone-number-input';
 
 function ProfilePage() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [editMode, setEditMode] = useState(false);
     const [formData, setFormData] = useState({
+        firstName: '',
+        lastName: '',
+        phone: ''
+    });
+    const [initialFormData, setInitialFormData] = useState({
         firstName: '',
         lastName: '',
         phone: ''
@@ -28,7 +33,87 @@ function ProfilePage() {
     const [showPasswordForm, setShowPasswordForm] = useState(false);
     const [showConfirmationModal, setShowConfirmationModal] = useState(false);
     const [pendingAction, setPendingAction] = useState(null);
+    const [phoneError, setPhoneError] = useState('');
+    const [isPhoneDuplicate, setIsPhoneDuplicate] = useState(false);
     const navigate = useNavigate();
+
+    const allowedCountries = ['RU', 'BY', 'KZ', 'UA'];
+
+    const formatDisplayPhone = (phone) => {
+        if (!phone) return 'Не указан';
+        
+        try {
+            const phoneNumber = parsePhoneNumber(phone);
+            if (!phoneNumber) return phone;
+            
+            return phoneNumber.formatInternational();
+        } catch {
+            return phone;
+        }
+    };
+
+    const validatePhone = (phone) => {
+        if (!phone) return true;
+        
+        try {
+            const phoneNumber = parsePhoneNumber(phone);
+            return phoneNumber && 
+                   allowedCountries.includes(phoneNumber.country) && 
+                   isValidPhoneNumber(phone);
+        } catch {
+            return false;
+        }
+    };
+
+    const checkPhoneDuplicate = async (phone) => {
+        if (!phone || phone === initialFormData.phone) {
+            setIsPhoneDuplicate(false);
+            return false;
+        }
+        
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/user/check-phone?phone=${encodeURIComponent(phone)}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Ошибка проверки номера');
+            }
+            
+            const data = await response.json();
+            setIsPhoneDuplicate(data.exists);
+            return data.exists;
+        } catch (error) {
+            console.error('Phone check error:', error);
+            return false;
+        }
+    };
+
+    const PhoneDisplay = ({ phone }) => {
+        const isValid = validatePhone(phone);
+        
+        return (
+            <div className="phone-display">
+                {formatDisplayPhone(phone)}
+                {!isValid && (
+                    <span className="phone-warning"> (некорректный формат)</span>
+                )}
+            </div>
+        );
+    };
+
+    const checkAndSetPhoneError = (phone) => {
+        const isValid = validatePhone(phone);
+        if (!isValid) {
+            setPhoneError('Введите корректный номер телефона');
+        } else {
+            setPhoneError('');
+        }
+        return isValid;
+    };
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -46,25 +131,22 @@ function ProfilePage() {
                     },
                 });
 
-                if (response.status === 403) {
-                    localStorage.removeItem('token');
-                    navigate('/login');
-                    return;
-                }
-
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
                 const userData = await response.json();
                 setUser(userData);
-                setFormData({
+                
+                const initialData = {
                     firstName: userData.first_name || '',
                     lastName: userData.last_name || '',
                     phone: userData.phone || ''
-                });
+                };
+                
+                setFormData(initialData);
+                setInitialFormData(initialData);
             } catch (error) {
-                console.error('Fetch error:', error);
                 toast.error('Не удалось загрузить профиль');
                 navigate('/login');
             } finally {
@@ -83,11 +165,35 @@ function ProfilePage() {
         }));
     };
 
-    const handlePhoneChange = (phone) => {
-        setFormData(prev => ({
-            ...prev,
-            phone: phone || ''
-        }));
+    const handlePhoneChange = async (phone) => {
+        if (!phone) {
+            setPhoneError('');
+            setIsPhoneDuplicate(false);
+            setFormData(prev => ({ ...prev, phone: '' }));
+            return;
+        }
+
+        if (phone.startsWith('+8')) {
+            setPhoneError('Некорректный код страны');
+            return;
+        }
+
+        if (phone.length > 20) {
+            setPhoneError('Номер телефона слишком длинный');
+            return;
+        }
+        
+        setFormData(prev => ({ ...prev, phone }));
+        checkAndSetPhoneError(phone);
+        
+        const timer = setTimeout(async () => {
+            const isDuplicate = await checkPhoneDuplicate(phone);
+            if (isDuplicate) {
+                setPhoneError('Этот номер уже зарегистрирован');
+            }
+        }, 500);
+        
+        return () => clearTimeout(timer);
     };
 
     const handlePasswordChange = (e) => {
@@ -113,10 +219,28 @@ function ProfilePage() {
         }
     };
 
+    const handleCancelEdit = () => {
+        setFormData(initialFormData);
+        setEditMode(false);
+        setShowPasswordForm(false);
+        setPhoneError('');
+        setAvatarFile(null);
+        setIsPhoneDuplicate(false);
+    };
+
     const handleSaveProfile = async () => {
         try {
-            if (formData.phone && !isValidPhoneNumber(formData.phone)) {
-                throw new Error('Введите корректный номер телефона');
+            let phoneToSave = formData.phone;
+            
+            if (phoneToSave && !checkAndSetPhoneError(phoneToSave)) {
+                toast.error('Пожалуйста, введите корректный номер телефона');
+                return;
+            }
+            
+            const isDuplicate = await checkPhoneDuplicate(phoneToSave);
+            if (isDuplicate) {
+                toast.error('Этот номер телефона уже зарегистрирован');
+                return;
             }
 
             const token = localStorage.getItem('token');
@@ -153,16 +277,31 @@ function ProfilePage() {
                 body: JSON.stringify({
                     firstName: formData.firstName,
                     lastName: formData.lastName,
-                    phone: formData.phone
+                    phone: phoneToSave
                 })
             });
             
             if (!profileResponse.ok) {
                 const errorData = await profileResponse.json();
-                throw new Error(errorData.error || 'Ошибка при обновлении профиля');
+                const errorMessage = errorData.error || 'Ошибка при обновлении профиля';
+                
+                if (errorData.error?.includes('уже существует')) {
+                    toast.error('Этот номер телефона уже зарегистрирован');
+                    setIsPhoneDuplicate(true);
+                } else {
+                    toast.error(errorMessage);
+                }
+                return;
             }
             
             const updatedUser = await profileResponse.json();
+            
+            const updatedInitialData = {
+                firstName: updatedUser.first_name || '',
+                lastName: updatedUser.last_name || '',
+                phone: updatedUser.phone || ''
+            };
+            
             setUser(prev => ({
                 ...prev,
                 first_name: updatedUser.first_name,
@@ -170,12 +309,17 @@ function ProfilePage() {
                 phone: updatedUser.phone
             }));
             
+            setInitialFormData(updatedInitialData);
+            setFormData(updatedInitialData);
+            
             toast.success('Профиль успешно обновлен!');
             setEditMode(false);
             setAvatarFile(null);
+            setPhoneError('');
+            setIsPhoneDuplicate(false);
         } catch (error) {
-            toast.error(error.message);
-            console.error('Ошибка:', error);
+            console.error('Save profile error:', error);
+            toast.error(error.message || 'Произошла ошибка при сохранении');
         }
     };
 
@@ -213,7 +357,6 @@ function ProfilePage() {
             setShowPasswordForm(false);
         } catch (error) {
             toast.error(error.message);
-            console.error('Ошибка:', error);
         }
     };
 
@@ -306,6 +449,7 @@ function ProfilePage() {
                                             value={formData.firstName}
                                             onChange={handleInputChange}
                                             placeholder="Введите ваше имя"
+                                            maxLength={50}
                                         />
                                     </div>
                                     <div className="form-group">
@@ -316,6 +460,7 @@ function ProfilePage() {
                                             value={formData.lastName}
                                             onChange={handleInputChange}
                                             placeholder="Введите вашу фамилию"
+                                            maxLength={50}
                                         />
                                     </div>
                                     <div className="form-group">
@@ -332,13 +477,20 @@ function ProfilePage() {
                                         <PhoneInput
                                             international
                                             defaultCountry="RU"
+                                            countries={allowedCountries}
                                             value={formData.phone}
                                             onChange={handlePhoneChange}
                                             placeholder="Введите номер телефона"
-                                            className={`phone-input ${formData.phone && !isValidPhoneNumber(formData.phone) ? 'invalid' : ''}`}
+                                            className={`phone-input ${phoneError ? 'invalid' : ''}`}
+                                            autoComplete="off"
                                         />
-                                        {formData.phone && !isValidPhoneNumber(formData.phone) && (
-                                            <div className="phone-error">Некорректный номер телефона</div>
+                                        {phoneError && (
+                                            <div className="phone-error">{phoneError}</div>
+                                        )}
+                                        {isPhoneDuplicate && (
+                                            <div className="phone-error" style={{color: 'red'}}>
+                                                Этот номер уже зарегистрирован
+                                            </div>
                                         )}
                                     </div>
 
@@ -362,6 +514,7 @@ function ProfilePage() {
                                                     value={passwordData.currentPassword}
                                                     onChange={handlePasswordChange}
                                                     placeholder="Введите текущий пароль"
+                                                    maxLength={50}
                                                 />
                                             </div>
                                             <div className="form-group">
@@ -372,6 +525,7 @@ function ProfilePage() {
                                                     value={passwordData.newPassword}
                                                     onChange={handlePasswordChange}
                                                     placeholder="Введите новый пароль"
+                                                    maxLength={50}
                                                 />
                                             </div>
                                             <div className="form-group">
@@ -382,6 +536,7 @@ function ProfilePage() {
                                                     value={passwordData.confirmPassword}
                                                     onChange={handlePasswordChange}
                                                     placeholder="Подтвердите новый пароль"
+                                                    maxLength={50}
                                                 />
                                             </div>
                                             <div className="password-form-actions">
@@ -409,17 +564,14 @@ function ProfilePage() {
                                     <div className="form-actions">
                                         <button 
                                             className="cancel-button"
-                                            onClick={() => {
-                                                setEditMode(false);
-                                                setShowPasswordForm(false);
-                                            }}
+                                            onClick={handleCancelEdit}
                                         >
                                             Отменить изменения
                                         </button>
                                         <button 
                                             className="save-button"
                                             onClick={() => handleActionConfirmation('saveProfile')}
-                                            disabled={formData.phone && !isValidPhoneNumber(formData.phone)}
+                                            disabled={phoneError || isPhoneDuplicate}
                                         >
                                             Сохранить профиль
                                         </button>
@@ -442,7 +594,7 @@ function ProfilePage() {
                                     <div className="info-row">
                                         <span className="info-label">Телефон:</span>
                                         <span className="info-value">
-                                            {user.phone || 'Не указан'}
+                                            <PhoneDisplay phone={user.phone} />
                                         </span>
                                     </div>
                                     <div className="info-row">

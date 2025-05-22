@@ -530,6 +530,26 @@ app.post('/api/reset-password', async (req, res) => {
 });
 
 // Маршруты для работы с пользователями
+app.get('/api/user/check-phone', authenticateToken, (req, res) => {
+    const { phone } = req.query;
+    
+    if (!phone) {
+        return res.status(400).json({ error: 'Не указан номер телефона' });
+    }
+    
+    db.get(
+        `SELECT id FROM users WHERE phone = ? AND id != ?`,
+        [phone, req.user.userId],
+        (err, row) => {
+            if (err) {
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+            
+            res.json({ exists: !!row });
+        }
+    );
+});
+
 app.get('/api/user', authenticateToken, (req, res) => {
     db.get(
         `SELECT id, first_name, last_name, email, phone, role, avatar FROM users WHERE id = ?`,
@@ -551,26 +571,42 @@ app.get('/api/user', authenticateToken, (req, res) => {
 app.put('/api/user', authenticateToken, (req, res) => {
     const { firstName, lastName, phone } = req.body;
     
-    db.run(
-        `UPDATE users SET 
-        first_name = ?,
-        last_name = ?,
-        phone = ?
-        WHERE id = ?`,
-        [firstName, lastName, phone, req.user.userId],
-        function(err) {
+    // Сначала проверяем дубликат телефона
+    db.get(
+        `SELECT id FROM users WHERE phone = ? AND id != ?`,
+        [phone, req.user.userId],
+        (err, row) => {
             if (err) {
-                return res.status(500).json({ error: 'Ошибка при обновлении данных' });
+                return res.status(500).json({ error: 'Ошибка проверки номера телефона' });
             }
             
-            db.get(
-                `SELECT id, first_name, last_name, email, phone, role, avatar FROM users WHERE id = ?`,
-                [req.user.userId],
-                (err, user) => {
-                    if (err || !user) {
-                        return res.status(500).json({ error: 'Ошибка при получении обновленных данных' });
+            if (row) {
+                return res.status(400).json({ error: 'Номер телефона уже зарегистрирован' });
+            }
+            
+            // Если дубликата нет, обновляем данные
+            db.run(
+                `UPDATE users SET 
+                first_name = ?,
+                last_name = ?,
+                phone = ?
+                WHERE id = ?`,
+                [firstName, lastName, phone, req.user.userId],
+                function(err) {
+                    if (err) {
+                        return res.status(500).json({ error: 'Ошибка при обновлении данных' });
                     }
-                    res.json(user);
+                    
+                    db.get(
+                        `SELECT id, first_name, last_name, email, phone, role, avatar FROM users WHERE id = ?`,
+                        [req.user.userId],
+                        (err, user) => {
+                            if (err || !user) {
+                                return res.status(500).json({ error: 'Ошибка при получении обновленных данных' });
+                            }
+                            res.json(user);
+                        }
+                    );
                 }
             );
         }

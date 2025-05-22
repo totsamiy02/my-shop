@@ -11,6 +11,8 @@ function ProductList() {
     const { t } = useTranslation();
     const [products, setProducts] = useState([]);
     const [filteredProducts, setFilteredProducts] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [showNotification, setShowNotification] = useState(false);
     const [notificationProductName, setNotificationProductName] = useState('');
     const [selectedProduct, setSelectedProduct] = useState(null);
@@ -18,7 +20,7 @@ function ProductList() {
         const savedBasket = localStorage.getItem('basket');
         return savedBasket ? JSON.parse(savedBasket) : [];
     });
-    const [searchQuery, setSearchQuery] = useState('');
+    const [initialLoad, setInitialLoad] = useState(true);
 
     const {
         currentPage,
@@ -29,14 +31,26 @@ function ProductList() {
         goToPage,
     } = usePagination(filteredProducts, 21);
 
-    const fetchProducts = () => {
-        fetch('/api/products')
-            .then((res) => res.json())
-            .then((data) => {
-                setProducts(data);
-                setFilteredProducts(data);
-            })
-            .catch((error) => console.error(t('product_list.load_error'), error));
+    const fetchProducts = async () => {
+        setIsLoading(true);
+        setError(null);
+        
+        try {
+            const response = await fetch('/api/products');
+            if (!response.ok) {
+                throw new Error(t('product_list.load_error'));
+            }
+            const data = await response.json();
+            setProducts(data);
+            setFilteredProducts(data); // Устанавливаем данные без фильтрации
+            setInitialLoad(false); // Помечаем что первоначальная загрузка завершена
+        } catch (error) {
+            console.error(error);
+            setError(error.message);
+            setFilteredProducts([]);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -44,28 +58,43 @@ function ProductList() {
     }, []);
 
     useEffect(() => {
-        localStorage.setItem('basket', JSON.stringify(basket));
-    }, [basket]);
+        if (!initialLoad && products.length > 0) {
+            localStorage.setItem('basket', JSON.stringify(basket));
+        }
+    }, [basket, initialLoad]);
 
     const handleFiltersChange = (filters) => {
-        let filtered = products.filter(p => {
-            const matchesSearch = p.name.toLowerCase().includes(filters.query.toLowerCase());
-            const matchesPrice = p.price >= filters.minPrice && p.price <= filters.maxPrice;
-            const matchesCategory = !filters.category || p.category_id == filters.category;
-            return matchesSearch && matchesPrice && matchesCategory;
-        });
+        if (initialLoad) return; // Не применяем фильтры пока идет первоначальная загрузка
 
+        let filtered = [...products]; // Создаем копию всех товаров
+        
+        // Применяем фильтры только если они заданы
+        if (filters.query) {
+            filtered = filtered.filter(p => 
+                p.name.toLowerCase().includes(filters.query.toLowerCase())
+            );
+        }
+
+        filtered = filtered.filter(p => 
+            p.price >= filters.minPrice && p.price <= filters.maxPrice
+        );
+
+        if (filters.category) {
+            filtered = filtered.filter(p => p.category_id == filters.category);
+        }
+
+        // Сортировка применяется только если явно выбрана
         if (filters.priceSort === 'asc') {
-            filtered = [...filtered].sort((a, b) => a.price - b.price);
+            filtered.sort((a, b) => a.price - b.price);
         } else if (filters.priceSort === 'desc') {
-            filtered = [...filtered].sort((a, b) => b.price - a.price);
+            filtered.sort((a, b) => b.price - a.price);
         }
 
         setFilteredProducts(filtered);
-        setSearchQuery(filters.query);
         goToPage(1);
     };
 
+    // Остальные методы остаются без изменений
     const handleAddToBasket = (product) => {
         const productInDb = products.find(p => p.id === product.id);
         if (!productInDb || productInDb.quantity <= 0) return;
@@ -103,62 +132,77 @@ function ProductList() {
 
     return (
         <div className="product-list-container">
-            <div className="product-list-header">
-                {searchQuery && <div className="search-query">{t('product_list.search_query', { query: searchQuery })}</div>}
-            </div>
+            <SearchWithFilters 
+                onFiltersChange={handleFiltersChange} 
+                disabled={initialLoad || isLoading}
+            />
 
-            <SearchWithFilters onFiltersChange={handleFiltersChange} />
-
-            <div className="product-grid">
-                {filteredProducts.length === 0 ? (
-                    <div className="no-products">
-                        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#FF6B00">
-                            <circle cx="12" cy="12" r="10" strokeWidth="1.5" />
-                            <path d="M18 6L6 18" strokeWidth="1.5" />
-                            <path d="M6 6l12 12" strokeWidth="1.5" />
-                        </svg>
-                        <p>{t('product_list.no_products')}</p>
-                        <button
-                            onClick={() => handleFiltersChange({
-                                query: '',
-                                minPrice: 0,
-                                maxPrice: 10000,
-                                category: '',
-                                priceSort: 'none'
-                            })}
-                            className="reset-filters-button"
-                        >
-                            {t('product_list.reset_filters')}
-                        </button>
-                    </div>
-                ) : (
-                    getCurrentData().map((product) => (
-                        <ProductCard
-                            key={product.id}
-                            id={product.id}
-                            image={product.image}
-                            title={product.name}
-                            price={product.price}
-                            quantity={product.quantity}
-                            handleAddToBasket={handleAddToBasket}
-                            onCardClick={() => setSelectedProduct(product)}
-                        />
-                    ))
-                )}
-            </div>
-
-            {filteredProducts.length > 21 && (
-                <div className="pagination-controls">
-                    <button onClick={prevPage} disabled={currentPage === 1}>
-                        {t('product_list.previous')}
-                    </button>
-                    <span>
-                        {t('product_list.page')} {currentPage} {t('product_list.of')} {totalPages}
-                    </span>
-                    <button onClick={nextPage} disabled={currentPage === totalPages}>
-                        {t('product_list.next')}
+            {isLoading ? (
+                <div className="loading-container">
+                    <div className="loading-spinner"></div>
+                    <p>{t('product_list.loading')}</p>
+                </div>
+            ) : error ? (
+                <div className="error-message">
+                    <p>{error}</p>
+                    <button 
+                        onClick={fetchProducts}
+                        className="retry-button"
+                    >
+                        {t('product_list.retry')}
                     </button>
                 </div>
+            ) : (
+                <>
+                    <div className="product-grid">
+                        {filteredProducts.length === 0 ? (
+                            <div className="no-products">
+                                <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#FF6B00">
+                                    <circle cx="12" cy="12" r="10" strokeWidth="1.5" />
+                                    <path d="M18 6L6 18" strokeWidth="1.5" />
+                                    <path d="M6 6l12 12" strokeWidth="1.5" />
+                                </svg>
+                                <p>{t('product_list.no_products')}</p>
+                                <button
+                                    onClick={() => {
+                                        setFilteredProducts(products);
+                                        goToPage(1);
+                                    }}
+                                    className="reset-filters-button"
+                                >
+                                    {t('product_list.reset_filters')}
+                                </button>
+                            </div>
+                        ) : (
+                            getCurrentData().map((product) => (
+                                <ProductCard
+                                    key={product.id}
+                                    id={product.id}
+                                    image={product.image}
+                                    title={product.name}
+                                    price={product.price}
+                                    quantity={product.quantity}
+                                    handleAddToBasket={handleAddToBasket}
+                                    onCardClick={() => setSelectedProduct(product)}
+                                />
+                            ))
+                        )}
+                    </div>
+
+                    {filteredProducts.length > 21 && (
+                        <div className="pagination-controls">
+                            <button onClick={prevPage} disabled={currentPage === 1}>
+                                {t('product_list.previous')}
+                            </button>
+                            <span>
+                                {t('product_list.page')} {currentPage} {t('product_list.of')} {totalPages}
+                            </span>
+                            <button onClick={nextPage} disabled={currentPage === totalPages}>
+                                {t('product_list.next')}
+                            </button>
+                        </div>
+                    )}
+                </>
             )}
 
             <Notification 

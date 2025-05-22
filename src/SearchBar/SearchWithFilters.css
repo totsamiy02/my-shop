@@ -284,3 +284,13 @@
         min-width: calc(50% - 10px);
     }
 }
+
+.search-with-filters.disabled {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.search-with-filters.disabled .history-item {
+    pointer-events: none;
+    opacity: 0.7;
+}
