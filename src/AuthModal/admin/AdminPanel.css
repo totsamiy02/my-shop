@@ -51,6 +51,11 @@
     font-weight: 500;
 }
 
+.admin-stats-loading {
+    text-align: center;
+    padding: 50px 0;
+}
+
 .admin-content {
     background-color: white;
     border-radius: 10px;
@@ -400,12 +405,13 @@
 }
 
 .admin-spinner {
-    width: 50px;
-    height: 50px;
-    border: 5px solid #f3f3f3;
-    border-top: 5px solid #ff6b00;
+    border: 4px solid rgba(255, 107, 0, 0.1);
+    border-top: 4px solid #FF6B00;
     border-radius: 50%;
+    width: 40px;
+    height: 40px;
     animation: spin 1s linear infinite;
+    margin: 0 auto 15px;
 }
 
 @keyframes spin {

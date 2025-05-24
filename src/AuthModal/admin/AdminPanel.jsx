@@ -6,6 +6,7 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ConfirmationModal from '../../Notification/ConfirmationModal.jsx';
 import './AdminPanel.css';
+import AdminStatsPanel from './AdminStatsPanel';
 
 function AdminPanel() {
     const navigate = useNavigate();
@@ -17,6 +18,7 @@ function AdminPanel() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [productToDelete, setProductToDelete] = useState(null);
+    
     
     const [productForm, setProductForm] = useState({
         name: '',
@@ -240,6 +242,12 @@ function AdminPanel() {
                         >
                             Список товаров
                         </button>
+                        <button 
+                            className={`admin-tab ${activeTab === 'stats' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('stats')}
+                        >
+                            Статистика
+                        </button>
                     </div>
                 </div>
                 
@@ -462,6 +470,10 @@ function AdminPanel() {
                                 </div>
                             )}
                         </div>
+                        
+                    )}
+                    {activeTab === 'stats' && (
+                        <AdminStatsPanel />
                     )}
                 </div>
             </main>

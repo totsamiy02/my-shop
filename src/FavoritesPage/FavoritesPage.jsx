@@ -9,13 +9,16 @@ import ProductModal from '../card/modal/ProductModal';
 import './FavoritesPage.css';
 import { useAuth } from '../hook/AuthContext';
 import { useFavorites } from '../hook/FavoritesContext';
+import { useBasket } from '../hook/useBasket';
 
 function FavoritesPage() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const { favorites, fetchFavorites } = useFavorites();
+  const { addToBasket } = useBasket();
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -50,28 +53,25 @@ function FavoritesPage() {
     };
   }, [isAuthenticated, fetchFavorites]);
 
-  const handleAddToBasket = (product) => {
-    const basket = JSON.parse(localStorage.getItem('basket')) || [];
-    const existingItem = basket.find(item => item.id === product.id);
-    
-    const updatedBasket = existingItem
-      ? basket.map(item => 
-          item.id === product.id 
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
-      : [...basket, { 
-          id: product.id,
-          title: product.name || product.title, 
-          price: product.price,
-          image: product.image,
-          quantity: 1 
-        }];
-    
-    localStorage.setItem('basket', JSON.stringify(updatedBasket));
-    window.dispatchEvent(new Event('basketUpdated'));
-    setShowNotification(true);
-    setTimeout(() => setShowNotification(false), 3000);
+  const handleAddToBasket = async (product) => {
+    if (!isAuthenticated) {
+      window.dispatchEvent(new CustomEvent('openAuthModal', {
+        detail: { mode: 'login' }
+      }));
+      return;
+    }
+
+    try {
+      await addToBasket(product.id);
+      setNotificationMessage(t('favorites.item_added'));
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
+    } catch (error) {
+      console.error('Ошибка при добавлении в корзину:', error);
+      setNotificationMessage(error.message || 'Ошибка при добавлении в корзину');
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
+    }
   };
 
   if (!isAuthenticated) {
@@ -158,7 +158,7 @@ function FavoritesPage() {
       )}
 
       <Notification 
-        message={t('favorites.item_added')} 
+        message={notificationMessage} 
         show={showNotification} 
         onClose={() => setShowNotification(false)}
       />

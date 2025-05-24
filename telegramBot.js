@@ -12,7 +12,7 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
 }
 
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
-  polling: false,
+  polling: true,
   filepath: false
 });
 
@@ -127,21 +127,14 @@ bot.onText(/\/start/, (msg) => {
   logAction(`Команда /start от ${chatId}`);
   
   if (activeAdmins.has(chatId)) {
-    const keyboard = {
-      reply_markup: {
-        keyboard: [
-          [{ text: '📊 Статистика' }, { text: '👥 Админы' }],
-          [{ text: '🚪 Выйти' }]
-        ],
-        resize_keyboard: true
-      }
-    };
-    
     return bot.sendMessage(
       chatId,
       `👋 Добро пожаловать в панель администратора!\n\n` +
-      `Используйте меню ниже для управления уведомлениями.`,
-      keyboard
+      `Используйте команды:\n` +
+      `/admins - список администраторов\n` +
+      `/stats - статистика бота\n` +
+      `/logout - выйти из системы`,
+      { reply_markup: { remove_keyboard: true }}
     ).catch(err => logError('Ошибка отправки сообщения:', err));
   }
   
@@ -162,8 +155,137 @@ bot.onText(/\/status/, (msg) => {
     `Статус бота:\n\n` +
     `Активных админов: ${activeAdmins.size}\n` +
     `Ваш статус: ${isAdmin ? '✅ Администратор' : '❌ Не администратор'}\n` +
-    `Ваш chat ID: ${chatId}`
+    `Ваш chat ID: ${chatId}`,
+    { reply_markup: { remove_keyboard: true }}
   ).catch(err => logError('Ошибка отправки статуса:', err));
+});
+
+// Команда списка админов
+bot.onText(/\/admins/, (msg) => {
+  const chatId = msg.chat.id;
+  
+  if (!activeAdmins.has(chatId)) {
+    return bot.sendMessage(
+      chatId, 
+      '❌ Только администраторы могут просматривать этот список',
+      { reply_markup: { remove_keyboard: true }}
+    );
+  }
+
+  const adminsList = [...activeAdmins].map(id => `• ${id}`).join('\n') || 'Нет активных администраторов';
+  
+  bot.sendMessage(
+    chatId,
+    `📋 Список активных администраторов:\n\n${adminsList}\n\nВсего: ${activeAdmins.size}`,
+    { reply_markup: { remove_keyboard: true }}
+  ).catch(err => logError('Ошибка отправки списка админов:', err));
+});
+
+// Команда статистики
+bot.onText(/\/stats/, (msg) => {
+  const chatId = msg.chat.id;
+  
+  if (!activeAdmins.has(chatId)) {
+    return bot.sendMessage(
+      chatId, 
+      '❌ Только администраторы могут просматривать статистику',
+      { reply_markup: { remove_keyboard: true }}
+    );
+  }
+
+  const logs = fs.readFileSync(LOGS_FILE, 'utf8');
+  const totalOrders = (logs.match(/выполнил заказ/g) || []).length;
+  const today = new Date().toISOString().split('T')[0];
+  const todayOrders = (logs.match(new RegExp(`${today}.*выполнил заказ`, 'g')) || []).length;
+
+  bot.sendMessage(
+    chatId,
+    `📊 Статистика бота:\n\n` +
+    `• Всего выполнено заказов: ${totalOrders}\n` +
+    `• Заказов сегодня: ${todayOrders}\n` +
+    `• Активных администраторов: ${activeAdmins.size}`,
+    { reply_markup: { remove_keyboard: true }}
+  ).catch(err => logError('Ошибка отправки статистики:', err));
+});
+
+// Команда выхода
+bot.onText(/\/logout/, (msg) => {
+  const chatId = msg.chat.id;
+  
+  if (activeAdmins.has(chatId)) {
+    activeAdmins.delete(chatId);
+    saveAdmins();
+    logAction(`Администратор ${chatId} вышел из системы`);
+  }
+  
+  bot.sendMessage(
+    chatId,
+    'Вы вышли из системы администратора',
+    { reply_markup: { remove_keyboard: true }}
+  ).catch(err => logError('Ошибка отправки сообщения:', err));
+});
+
+// Обработчик нажатий на inline-кнопки
+bot.on('callback_query', async (callbackQuery) => {
+  const chatId = callbackQuery.message.chat.id;
+  const messageId = callbackQuery.message.message_id;
+  const data = callbackQuery.data;
+  const admin = callbackQuery.from;
+
+  try {
+    if (data.startsWith('complete:')) {
+      const orderId = data.split(':')[1];
+      
+      if (!activeAdmins.has(chatId)) {
+        return bot.answerCallbackQuery(callbackQuery.id, {
+          text: '❌ Только администраторы могут выполнять заказы',
+          show_alert: true
+        });
+      }
+
+      const adminName = admin.username 
+        ? `@${admin.username}` 
+        : `${admin.first_name || ''} ${admin.last_name || ''}`.trim();
+
+      const completionDate = new Date().toLocaleString('ru-RU', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      const originalText = callbackQuery.message.text;
+      const updatedText = originalText.replace(
+        '⏳ <i>Статус: В обработке</i>',
+        `✅ <i>Статус: Выполнен</i>\n` +
+        `📅 <i>Дата выполнения:</i> <b>${completionDate}</b>\n` +
+        `👨‍💼 <i>Администратор:</i> <b>${adminName}</b>`
+      );
+
+      await bot.editMessageText(updatedText, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: []
+        }
+      });
+
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: `Вы выполнили заказ #${orderId}`,
+        show_alert: false
+      });
+
+      logAction(`Админ ${adminName} (${chatId}) выполнил заказ #${orderId} в ${completionDate}`);
+    }
+  } catch (err) {
+    logError('Ошибка обработки callback:', err);
+    bot.answerCallbackQuery(callbackQuery.id, {
+      text: 'Произошла ошибка при обработке запроса',
+      show_alert: true
+    });
+  }
 });
 
 // Обработка сообщений
@@ -185,7 +307,8 @@ bot.on('message', (msg) => {
       const timeLeft = Math.ceil((blockedUntil - now) / 1000 / 60);
       return bot.sendMessage(
         chatId,
-        `❌ Слишком много попыток. Попробуйте через ${timeLeft} минут.`
+        `❌ Слишком много попыток. Попробуйте через ${timeLeft} минут.`,
+        { reply_markup: { remove_keyboard: true }}
       ).catch(err => logError('Ошибка отправки сообщения:', err));
     }
   }
@@ -195,21 +318,15 @@ bot.on('message', (msg) => {
     saveAdmins();
     authAttempts.delete(chatId);
     
-    const keyboard = {
-      reply_markup: {
-        keyboard: [
-          [{ text: '📊 Статистика' }, { text: '👥 Админы' }],
-          [{ text: '🚪 Выйти' }]
-        ],
-        resize_keyboard: true
-      }
-    };
-    
     bot.sendMessage(
       chatId,
       '✅ Вы успешно авторизованы!\n\n' +
-      'Теперь вы будете получать уведомления о новых заказах.',
-      keyboard
+      'Теперь вы будете получать уведомления о новых заказах.\n\n' +
+      'Доступные команды:\n' +
+      '/admins - список администраторов\n' +
+      '/stats - статистика бота\n' +
+      '/logout - выйти из системы',
+      { reply_markup: { remove_keyboard: true }}
     ).then(() => {
       logAction(`Новый администратор: ${chatId}`);
     }).catch(err => {
@@ -225,12 +342,14 @@ bot.on('message', (msg) => {
       const timeLeft = Math.ceil(BLOCK_TIME / 1000 / 60);
       bot.sendMessage(
         chatId,
-        `❌ Слишком много попыток. Попробуйте через ${timeLeft} минут.`
+        `❌ Слишком много попыток. Попробуйте через ${timeLeft} минут.`,
+        { reply_markup: { remove_keyboard: true }}
       ).catch(err => logError('Ошибка отправки сообщения:', err));
     } else {
       bot.sendMessage(
         chatId,
-        `❌ Неверный пароль! Осталось попыток: ${MAX_ATTEMPTS - attemptData.attempts}`
+        `❌ Неверный пароль! Осталось попыток: ${MAX_ATTEMPTS - attemptData.attempts}`,
+        { reply_markup: { remove_keyboard: true }}
       ).catch(err => logError('Ошибка отправки сообщения:', err));
     }
     
@@ -283,7 +402,6 @@ async function sendOrderNotification(orderData) {
     message += `\n💰 <b>ИТОГО: ${orderData.totalAmount}₽</b>`;
     message += `\n\n⏳ <i>Статус: В обработке</i>`;
 
-    // Убираем кнопку с tel: и оставляем только кнопку "Выполнить"
     const options = {
       parse_mode: 'HTML',
       reply_markup: {
@@ -329,56 +447,24 @@ function formatPhoneNumber(phone) {
   return cleaned;
 }
 
-
 // ==============================================
-// ЗАПУСК И УПРАВЛЕНИЕ БОТОМ
+// ЗАПУСК БОТА
 // ==============================================
 
-let isPolling = false;
+setupBotMenu();
+logAction(`🤖 Бот запущен. Активных админов: ${activeAdmins.size}`);
 
-function startBot() {
-  if (isPolling) {
-    logAction('Бот уже запущен');
-    return;
-  }
-
-  try {
-    bot.startPolling();
-    isPolling = true;
-    setupBotMenu();
-    logAction(`🤖 Бот запущен. Активных админов: ${activeAdmins.size}`);
-    
-    if (activeAdmins.size === 0) {
-      logAction('⚠️ Нет авторизованных администраторов!');
-    }
-  } catch (err) {
-    logError('Ошибка запуска бота:', err);
-    process.exit(1);
-  }
+if (activeAdmins.size === 0) {
+  logAction('⚠️ Нет авторизованных администраторов!');
 }
 
-function stopBot() {
-  if (isPolling) {
-    bot.stopPolling();
-    isPolling = false;
-    logAction('Бот остановлен');
-  }
-}
-
-// Автоматический запуск бота при подключении модуля
-startBot();
-
-// Очистка при завершении
 process.on('SIGINT', () => {
   logAction('Бот завершает работу...');
-  stopBot();
   process.exit();
 });
 
 module.exports = {
   bot,
   sendOrderNotification,
-  startBot,
-  stopBot,
   activeAdmins
 };

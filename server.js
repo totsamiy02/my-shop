@@ -1032,6 +1032,173 @@ app.get('/api/admin/categories', authenticateToken, (req, res) => {
     );
 });
 
+// Маршруты для статистики заказов
+app.get('/api/admin/orders/stats', authenticateToken, (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    
+    const queries = {
+        stats: `
+            SELECT 
+                (SELECT COUNT(*) FROM orders) as totalOrders,
+                (SELECT COUNT(*) FROM orders WHERE date(created_at) = date('now')) as todayOrders,
+                (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status != 'cancelled') as totalRevenue,
+                (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE date(created_at) = date('now') AND status != 'cancelled') as todayRevenue
+        `,
+        popularProducts: `
+            SELECT p.id, p.name, p.image, 
+                   COALESCE(SUM(oi.quantity), 0) as total_quantity, 
+                   COALESCE(SUM(oi.price * oi.quantity), 0) as total_revenue
+            FROM products p
+            LEFT JOIN order_items oi ON p.id = oi.product_id
+            LEFT JOIN orders o ON oi.order_id = o.id AND o.status != 'cancelled'
+            GROUP BY p.id
+            ORDER BY total_quantity DESC, total_revenue DESC
+            LIMIT 5
+        `,
+        recentOrders: `
+            SELECT o.id, o.total_amount, o.status, o.created_at, 
+                   u.first_name || ' ' || u.last_name as customer_name
+            FROM orders o
+            JOIN users u ON o.user_id = u.id
+            ORDER BY o.created_at DESC
+            LIMIT 10
+        `
+    };
+    
+    db.serialize(() => {
+        const results = {};
+        
+        // Запрос статистики
+        db.get(queries.stats, (err, stats) => {
+            if (err) {
+                console.error('Error fetching stats:', err);
+                results.stats = {
+                    totalOrders: 0,
+                    todayOrders: 0,
+                    totalRevenue: 0,
+                    todayRevenue: 0
+                };
+            } else {
+                results.stats = stats;
+            }
+            
+            // Запрос популярных товаров
+            db.all(queries.popularProducts, (err, products) => {
+                if (err) {
+                    console.error('Error fetching popular products:', err);
+                    results.popularProducts = [];
+                } else {
+                    results.popularProducts = products.filter(p => p.total_quantity > 0);
+                }
+                
+                // Запрос последних заказов
+                db.all(queries.recentOrders, (err, orders) => {
+                    if (err) {
+                        console.error('Error fetching recent orders:', err);
+                        results.recentOrders = [];
+                    } else {
+                        results.recentOrders = orders;
+                    }
+                    
+                    res.json(results);
+                });
+            });
+        });
+    });
+});
+
+// Полная история заказов с пагинацией
+app.get('/api/admin/orders/history', authenticateToken, (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    
+    const query = `
+        SELECT o.id, o.total_amount, o.status, o.created_at, 
+               u.first_name || ' ' || u.last_name as customer_name,
+               COUNT(oi.id) as items_count
+        FROM orders o
+        JOIN users u ON o.user_id = u.id
+        LEFT JOIN order_items oi ON o.id = oi.order_id
+        GROUP BY o.id
+        ORDER BY o.created_at DESC
+        LIMIT ? OFFSET ?
+    `;
+    
+    const countQuery = `SELECT COUNT(*) as total FROM orders`;
+    
+    db.serialize(() => {
+        db.get(countQuery, (err, countResult) => {
+            if (err) {
+                console.error('Error counting orders:', err);
+                return res.status(500).json({ error: 'Ошибка при получении количества заказов' });
+            }
+            
+            db.all(query, [limit, offset], (err, orders) => {
+                if (err) {
+                    console.error('Error fetching orders:', err);
+                    return res.status(500).json({ error: 'Ошибка при получении заказов' });
+                }
+                
+                res.json({
+                    orders,
+                    total: countResult.total,
+                    page,
+                    totalPages: Math.ceil(countResult.total / limit)
+                });
+            });
+        });
+    });
+});
+
+// Детали конкретного заказа
+app.get('/api/admin/orders/:id', authenticateToken, (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    
+    const orderId = req.params.id;
+    
+    const orderQuery = `
+        SELECT o.*, u.first_name || ' ' || u.last_name as customer_name
+        FROM orders o
+        JOIN users u ON o.user_id = u.id
+        WHERE o.id = ?
+    `;
+    
+    const itemsQuery = `
+        SELECT oi.*, p.name as product_name, p.image as product_image
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        WHERE oi.order_id = ?
+    `;
+    
+    db.serialize(() => {
+        db.get(orderQuery, [orderId], (err, order) => {
+            if (err) {
+                console.error('Error fetching order:', err);
+                return res.status(500).json({ error: 'Ошибка при получении заказа' });
+            }
+            
+            if (!order) {
+                return res.status(404).json({ error: 'Заказ не найден' });
+            }
+            
+            db.all(itemsQuery, [orderId], (err, items) => {
+                if (err) {
+                    console.error('Error fetching order items:', err);
+                    return res.status(500).json({ error: 'Ошибка при получении товаров заказа' });
+                }
+                
+                res.json({
+                    ...order,
+                    items
+                });
+            });
+        });
+    });
+});
+
 // Роуты для корзины
 const cartRouter = express.Router();
 
@@ -1416,7 +1583,7 @@ app.use((err, req, res, next) => {
 // Запуск сервера
 app.listen(port, () => {
     console.log(`Сервер запущен на http://localhost:${port}`);
-    startBot(); // Запускаем бота
+    // startBot(); // Запускаем бота
 
     // Создаем необходимые папки при запуске
     const foldersToCreate = ['uploads', 'public/img'];
