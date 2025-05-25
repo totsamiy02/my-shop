@@ -611,6 +611,12 @@ function ProfilePage() {
                                         >
                                             Редактировать профиль
                                         </button>
+                                         <button 
+                                            className="order-history-button"
+                                            onClick={() => navigate('/orders')}
+                                        >
+                                            История заказов
+                                        </button>
                                     </div>
                                 </>
                             )}

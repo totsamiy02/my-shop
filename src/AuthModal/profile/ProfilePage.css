@@ -345,27 +345,45 @@
 }
 
 .edit-button {
-    background-color: transparent;
-    color: #ff6b00;
-    border: 2px solid #ff6b00;
-    padding: 10px 20px;
+    background-color: #ff6b00;
+    color: white;
+    border: none;
+    padding: 10px 25px;
     border-radius: 30px;
     font-size: 1rem;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(255, 107, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 200px;
 }
 
 .edit-button:hover {
-    background-color: #ff6b00;
-    color: white;
+    background-color: #e05d00;
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(255, 107, 0, 0.2);
+    box-shadow: 0 4px 8px rgba(255, 107, 0, 0.3);
+}
+
+.edit-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 3px rgba(255, 107, 0, 0.2);
+}
+
+.edit-button::before {
+    content: '✏️';
+    margin-right: 8px;
+    font-size: 1.1em;
 }
 
 .profile-actions {
-    margin-top: 30px;
     display: flex;
+    gap: 15px;
+    margin-top: 30px;
     justify-content: flex-end;
+    flex-wrap: wrap;
 }
 
 /* Стили для загрузки */
@@ -438,10 +456,62 @@ input:-webkit-autofill:focus {
     .cancel-password-button {
         width: 100%;
     }
+    .profile-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .edit-button,
+    .order-history-button {
+        width: 100%;
+        min-width: auto;
+    }
 }
 
 @media (max-width: 480px) {
     .profile-container {
         padding: 20px 10px;
     }
+    .edit-button,
+    .order-history-button {
+        padding: 12px 20px;
+        font-size: 0.95rem;
+    }
+    .edit-button::before,
+    .order-history-button::before {
+        margin-right: 6px;
+    }
+}
+
+.order-history-button {
+    background-color: #4a6fa5;
+    color: white;
+    border: none;
+    padding: 10px 25px;
+    border-radius: 30px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(74, 111, 165, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 200px;
+}
+
+.order-history-button:hover {
+    background-color: #3a5a8f;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(74, 111, 165, 0.3);
+}
+
+.order-history-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 3px rgba(74, 111, 165, 0.2);
+}
+
+.order-history-button::before {
+    content: '📋';
+    margin-right: 8px;
+    font-size: 1.1em;
 }

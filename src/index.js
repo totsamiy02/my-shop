@@ -19,6 +19,7 @@ import AdminPanel from './AuthModal/admin/AdminPanel.jsx';
 import PrivateRoute from './AuthModal/admin/PrivateRoute.jsx';
 import { FavoritesProvider } from './hook/FavoritesContext.js';
 import './i18n.js'; // Добавьте эту строку
+import OrderHistoryPage from './AuthModal/profile/OrderHistoryPage.jsx'; // Импортируем страницу истории заказов
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -41,6 +42,7 @@ root.render(
             <Route path="/favorites" element={<FavoritesPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/admin" element={<PrivateRoute adminOnly={true}><AdminPanel /></PrivateRoute>} />
+            <Route path="/orders" element={<OrderHistoryPage />} />
           </Routes>
         </BrowserRouter>
       </FavoritesProvider>

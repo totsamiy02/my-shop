@@ -771,6 +771,74 @@ app.put('/api/user/avatar', authenticateToken, upload.single('avatar'), async (r
   }
 });
 
+// история заказов пользователя
+app.get('/api/user/orders', authenticateToken, async (req, res) => {
+    try {
+        // Используем req.user.userId вместо req.user.id
+        const userId = req.user.userId;
+        
+        const orders = await new Promise((resolve, reject) => {
+            db.all(`
+                SELECT 
+                    o.id, 
+                    o.total_amount, 
+                    o.status, 
+                    o.created_at,
+                    o.first_name,
+                    o.last_name,
+                    o.address,
+                    o.email,
+                    o.phone,
+                    o.payment_method,
+                    COUNT(oi.id) as items_count
+                FROM orders o
+                LEFT JOIN order_items oi ON o.id = oi.order_id
+                WHERE o.user_id = ?
+                GROUP BY o.id
+                ORDER BY o.created_at DESC
+            `, [userId], (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(rows || []); // Гарантируем, что вернется массив
+                }
+            });
+        });
+
+        // Получаем товары для каждого заказа
+        for (const order of orders) {
+            const items = await new Promise((resolve, reject) => {
+                db.all(`
+                    SELECT 
+                        oi.id,
+                        oi.quantity,
+                        oi.price,
+                        p.name as product_name,
+                        p.image as product_image
+                    FROM order_items oi
+                    JOIN products p ON oi.product_id = p.id
+                    WHERE oi.order_id = ?
+                `, [order.id], (err, rows) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(rows || []); // Гарантируем, что вернется массив
+                    }
+                });
+            });
+            
+            order.items = items;
+        }
+
+        res.json(orders);
+    } catch (error) {
+        console.error('Error fetching user orders:', error);
+        res.status(500).json({ 
+            error: 'Internal server error',
+            details: error.message 
+        });
+    }
+});
 // Маршруты для товаров (публичные)
 app.get('/api/products', (req, res) => {
     const query = `
