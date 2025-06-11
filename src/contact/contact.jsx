@@ -30,7 +30,7 @@ function Contacts() {
               </div>
               <div className="phone-block">
                 <img src={phoneIcon} alt={t('contacts.phone')} className="phone-icon" />
-                <span>+7 (495) 123-45-67</span>
+                <span>+7 (949) 377-56-97</span>
               </div>
             </div>
           </div>

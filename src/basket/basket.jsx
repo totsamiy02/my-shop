@@ -39,7 +39,11 @@ function Basket() {
     });
     const [formSuccess, setFormSuccess] = useState(false);
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-    const [notification, setNotification] = useState({ show: false, message: '', duration: 3000 });
+    const [notification, setNotification] = useState({ 
+        show: false, 
+        message: '', 
+        duration: 3000 
+    });
 
     useEffect(() => {
         if (!isAuthenticated) {
@@ -85,65 +89,70 @@ function Basket() {
     };
 
     const handleCheckoutSubmit = async (e) => {
-  e.preventDefault();
-  
-  const validationError = validateForm();
-  if (validationError) {
-    setNotification({
-      show: true,
-      message: validationError,
-      duration: 3000
-    });
-    return;
-  }
+        e.preventDefault();
+        
+        const validationError = validateForm();
+        if (validationError) {
+            setNotification({
+                show: true,
+                message: validationError,
+                duration: 3000
+            });
+            return;
+        }
 
-  try {
-    const cleanedPhone = formData.phone.replace(/\D/g, '');
-    const orderData = {
-      formData: {
-        ...formData,
-        phone: cleanedPhone
-      },
-      basket: basket.map(item => ({
-        product_id: item.product_id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        image: item.image // Добавьте это поле, если есть
-      })),
-      totalAmount
+        try {
+            const cleanedPhone = formData.phone.replace(/\D/g, '');
+            const orderData = {
+                formData: {
+                    ...formData,
+                    phone: cleanedPhone
+                },
+                basket: basket.map(item => ({
+                    product_id: item.product_id,
+                    name: item.name,
+                    price: item.price,
+                    quantity: item.quantity,
+                    image: item.image
+                })),
+                totalAmount
+            };
+
+            const response = await fetch('/api/orders/checkout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify(orderData)
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                setNotification({
+                    show: true,
+                    message: 'Заказ оформлен!',
+                    duration: 3000
+                });
+                await clearBasket();
+                setIsCheckoutOpen(false);
+                setFormSuccess(true);
+            } else {
+                throw new Error('Ошибка оформления заказа');
+            }
+        } catch (error) {
+            setNotification({
+                show: true,
+                message: error.message || 'Ошибка при оформлении заказа',
+                duration: 3000
+            });
+        }
     };
 
-    const response = await fetch('/api/orders/checkout', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify(orderData)
-    });
-
-    const result = await response.json();
-    
-    if (result.success) {
-      setNotification({
-        show: true,
-        message: `Заказ #${result.orderId} оформлен! ${result.telegramNotification ? 'Чек отправлен в Telegram.' : ''}`,
-        duration: 5000
-      });
-      await clearBasket();
-      setIsCheckoutOpen(false);
-    } else {
-      throw new Error('Ошибка оформления заказа');
-    }
-  } catch (error) {
-    setNotification({
-      show: true,
-      message: error.message || 'Ошибка при оформлении заказа',
-      duration: 5000
-    });
-  }
-};
+    const handleCloseNotification = () => {
+        setNotification(prev => ({ ...prev, show: false }));
+    };
 
     const handleGoToCatalog = () => {
         navigate('/');
@@ -261,7 +270,7 @@ function Basket() {
                     message={notification.message} 
                     show={notification.show} 
                     duration={notification.duration}
-                    onClose={() => setNotification({...notification, show: false})} 
+                    onClose={handleCloseNotification}
                 />
 
                 {isLoading && basket.length === 0 ? (

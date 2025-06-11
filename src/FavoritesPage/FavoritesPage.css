@@ -1,11 +1,11 @@
-/* FavoritesPage.css - полная исправленная версия */
+/* FavoritesPage.css */
 
 /* Основные стили страницы */
 .fav-main-container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 40px 20px;
-    min-height: calc(100vh - 200px);
+    padding: 20px 0 60px;
+    width: 100%;
     box-sizing: border-box;
 }
 
@@ -16,6 +16,7 @@
     color: #333;
     margin-bottom: 30px;
     text-align: center;
+    padding: 0 20px;
 }
 
 /* Состояние пустого избранного */
@@ -61,19 +62,14 @@
     transform: translateY(-2px);
 }
 
-/* Сетка товаров - исправленная версия */
+/* Сетка товаров - идентичная основной */
 .fav-products-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 25px;
+    padding: 0 20px;
     width: 100%;
     box-sizing: border-box;
-}
-
-/* Стили для карточек внутри сетки */
-.fav-products-grid .product-card {
-    width: 100%;
-    min-width: 0; /* Важно для правильного сжатия */
 }
 
 /* Стили для неавторизованных пользователей */
@@ -82,6 +78,7 @@
     justify-content: center;
     align-items: center;
     min-height: calc(100vh - 200px);
+    padding: 20px;
 }
 
 .fav-auth-content {
@@ -143,38 +140,21 @@
 }
 
 /* Адаптивность */
-@media (max-width: 1300px) {
+@media (max-width: 768px) {
     .fav-products-grid {
-        grid-template-columns: repeat(3, minmax(280px, 1fr));
-    }
-}
-
-@media (max-width: 1100px) {
-    .fav-products-grid {
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
         gap: 20px;
     }
-}
-
-@media (max-width: 992px) {
-    .fav-products-grid {
-        grid-template-columns: repeat(2, minmax(280px, 1fr));
-    }
-}
-
-@media (max-width: 768px) {
-    .fav-main-container {
-        padding: 20px 15px;
-    }
     
-    .fav-products-grid {
-        gap: 15px;
+    .fav-main-title {
+        font-size: 28px;
     }
 }
 
-@media (max-width: 576px) {
+@media (max-width: 480px) {
     .fav-products-grid {
-        grid-template-columns: minmax(280px, 1fr);
-        justify-items: center;
+        grid-template-columns: 1fr;
+        padding: 0 15px;
     }
     
     .fav-empty-state {
@@ -184,18 +164,8 @@
     .fav-empty-state h2 {
         font-size: 20px;
     }
-}
-
-@media (max-width: 400px) {
-    .fav-main-title {
-        font-size: 28px;
-    }
     
     .fav-catalog-link {
         padding: 10px 20px;
-    }
-    
-    .fav-products-grid {
-        grid-template-columns: 1fr;
     }
 }

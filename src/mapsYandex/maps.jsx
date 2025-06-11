@@ -15,12 +15,12 @@ function Map() {
 
       // Создаём новую карту
       map = new window.ymaps.Map('map', {
-        center: [55.751574, 37.573856],
+        center: [48.0027, 37.8052],
         zoom: 14,
         controls: ['zoomControl'],
       });
 
-      const placemark = new window.ymaps.Placemark([55.751574, 37.573856], {
+      const placemark = new window.ymaps.Placemark([48.0027, 37.8052], {
         balloonContent: 'Офис компании',
       });
 

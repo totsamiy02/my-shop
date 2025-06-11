@@ -36,7 +36,7 @@ app.set('trust proxy', 1);
 // Настройка Multer для загрузки файлов
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, 'temp_uploads');
+    const uploadPath = path.join(__dirname, 'uploads');
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
@@ -70,49 +70,6 @@ const db = new sqlite3.Database('./store.db', (err) => {
         console.error('Database connection error:', err);
     } else {
         console.log('Connected to SQLite database');
-        
-        // Создаем таблицы, если они не существуют
-        db.serialize(() => {
-            db.run(`
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    first_name TEXT NOT NULL,
-                    last_name TEXT NOT NULL,
-                    phone TEXT NOT NULL UNIQUE,
-                    email TEXT NOT NULL UNIQUE,
-                    password TEXT NOT NULL,
-                    role TEXT DEFAULT 'user',
-                    avatar TEXT DEFAULT '/img/avatar.jpg',
-                    reset_token TEXT,
-                    reset_token_expires INTEGER,
-                    failed_login_attempts INTEGER DEFAULT 0,
-                    last_failed_login INTEGER
-                )
-            `);
-            
-            db.run(`
-                CREATE TABLE IF NOT EXISTS categories (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL UNIQUE,
-                    slug TEXT UNIQUE
-                )
-            `);
-            
-            db.run(`
-                CREATE TABLE IF NOT EXISTS products (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    price REAL NOT NULL,
-                    description TEXT,
-                    image TEXT,
-                    quantity INTEGER DEFAULT 0,
-                    brand TEXT NOT NULL DEFAULT 'Noname',
-                    category_id INTEGER,
-                    weight TEXT DEFAULT 'N/A',
-                    FOREIGN KEY(category_id) REFERENCES categories(id)
-                )
-            `);
-        });
     }
 });
 
@@ -203,7 +160,7 @@ app.post('/api/register', async (req, res) => {
                         const token = jwt.sign(
                             { userId: user.id, role: user.role },
                             process.env.JWT_SECRET || 'your-secret-key',
-                            { expiresIn: '1h' }
+                            { expiresIn: '24h' }
                         );
                         
                         res.status(201).json({ 
@@ -329,7 +286,7 @@ app.post('/api/login', authLimiter, async (req, res) => {
                         lastName: user.last_name
                     },
                     process.env.JWT_SECRET || 'your-secret-key',
-                    { expiresIn: '1h' }
+                    { expiresIn: '24h' }
                 );
                 
                 // Формирование ответа
@@ -851,7 +808,14 @@ app.get('/api/products', (req, res) => {
         if (err) {
             return res.status(500).json({ error: 'Ошибка получения товаров' });
         }
-        res.json(products);
+        
+        // Добавляем полный URL к изображениям
+        const productsWithFullUrls = products.map(product => ({
+            ...product,
+            image: product.image ? `${req.protocol}://${req.get('host')}${product.image}` : null
+        }));
+        
+        res.json(productsWithFullUrls);
     });
 });
 
@@ -1527,11 +1491,20 @@ cartRouter.delete('/clear', authenticateToken, (req, res) => {
 app.use('/api/cart', cartRouter);
 
 
-// Роуты для заказов
 app.post('/api/orders/checkout', authenticateToken, async (req, res) => {
   try {
     const { formData, basket, totalAmount } = req.body;
     const userId = req.user.id;
+
+    // Валидация данных
+    if (!formData || !basket || !totalAmount) {
+      return res.status(400).json({ error: 'Неполные данные заказа' });
+    }
+
+    // Проверка корзины
+    if (!Array.isArray(basket) || basket.length === 0) {
+      return res.status(400).json({ error: 'Корзина пуста' });
+    }
 
     // 1. Сохраняем заказ в БД
     const orderId = await new Promise((resolve, reject) => {
@@ -1539,8 +1512,9 @@ app.post('/api/orders/checkout', authenticateToken, async (req, res) => {
         `INSERT INTO orders (
           user_id, total_amount, status,
           first_name, last_name, address,
-          email, phone, payment_method
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          email, phone, payment_method,
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
         [
           userId,
           totalAmount,
@@ -1564,9 +1538,15 @@ app.post('/api/orders/checkout', authenticateToken, async (req, res) => {
       return new Promise((resolve, reject) => {
         db.run(
           `INSERT INTO order_items (
-            order_id, product_id, quantity, price
-          ) VALUES (?, ?, ?, ?)`,
-          [orderId, item.product_id, item.quantity, item.price],
+            order_id, product_id, quantity, price, product_name
+          ) VALUES (?, ?, ?, ?, ?)`,
+          [
+            orderId,
+            item.product_id,
+            item.quantity,
+            item.price,
+            item.name
+          ],
           (err) => {
             if (err) reject(err);
             else resolve();
@@ -1575,29 +1555,26 @@ app.post('/api/orders/checkout', authenticateToken, async (req, res) => {
       });
     }));
 
-    // 3. Отправляем уведомление в Telegram
-    let telegramSent = false;
-    try {
-      telegramSent = await sendOrderNotification({
-        orderId,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        phone: formData.phone,
-        address: formData.address,
-        basket: basket.map(item => ({
-          title: item.name,
-          quantity: item.quantity,
-          price: item.price,
-          image: item.image || null
-        })),
-        totalAmount,
-        paymentMethod: formData.paymentMethod
-      });
-    } catch (tgError) {
-      console.error('Ошибка Telegram:', tgError);
-    }
+    // 3. Отправляем уведомление в Telegram (в фоновом режиме, не ждем результата)
+    sendOrderNotification({
+      orderId,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      phone: formData.phone,
+      address: formData.address,
+      basket: basket.map(item => ({
+        title: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        image: item.image || null
+      })),
+      totalAmount,
+      paymentMethod: formData.paymentMethod
+    }).catch(tgError => {
+      console.error('Ошибка Telegram уведомления:', tgError);
+    });
 
-    // 4. Очищаем корзину
+    // 4. Очищаем корзину пользователя
     await new Promise((resolve, reject) => {
       db.run(
         'DELETE FROM cart_items WHERE user_id = ?',
@@ -1609,21 +1586,23 @@ app.post('/api/orders/checkout', authenticateToken, async (req, res) => {
       );
     });
 
+    // Успешный ответ
     res.json({ 
       success: true,
-      orderId,
-      telegramNotification: telegramSent
+      message: 'Заказ успешно оформлен'
     });
 
   } catch (error) {
     console.error('Ошибка оформления заказа:', error);
     res.status(500).json({ 
       error: 'Ошибка при оформлении заказа',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      ...(process.env.NODE_ENV === 'development' && { 
+        details: error.message,
+        stack: error.stack 
+      })
     });
   }
 });
-
 
 const favoritesRoutes = require('./src/routes/favoritesRoutes');
 app.use('/api/favorites', (req, res, next) => {

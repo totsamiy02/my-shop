@@ -1,7 +1,17 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import './Notification.css';
 
-function Notification({ message, show }) {
+function Notification({ message, show, duration = 3000, onClose }) {
+    useEffect(() => {
+        if (show && duration) {
+            const timer = setTimeout(() => {
+                onClose && onClose();
+            }, duration);
+            
+            return () => clearTimeout(timer);
+        }
+    }, [show, duration, onClose]);
+
     return (
         <div className={`notification ${show ? 'show' : ''}`}>
             <div className="notification-content">

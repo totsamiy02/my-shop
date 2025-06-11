@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import './ProductCard.css';
-import heartOutline from '../img/сердце.svg';
-import heartFilled from '../img/сердце черное.svg';
 import { useAuth } from '../hook/AuthContext';
 import { useFavorites } from '../hook/FavoritesContext';
 
@@ -41,6 +39,21 @@ function ProductCard({ id, image, title, price, quantity, handleAddToBasket, onC
     }
   };
 
+  const HeartIcon = ({ filled }) => (
+    <svg 
+      width="22" 
+      height="22" 
+      viewBox="0 0 16 16" 
+      fill={filled ? "#ff8800" : "none"}
+      stroke={filled ? "#ff8800" : "#000000"}
+    >
+      <path 
+        d="M1.24264 8.24264L8 15L14.7574 8.24264C15.553 7.44699 16 6.36786 16 5.24264V5.05234C16 2.8143 14.1857 1 11.9477 1C10.7166 1 9.55233 1.55959 8.78331 2.52086L8 3.5L7.21669 2.52086C6.44767 1.55959 5.28338 1 4.05234 1C1.8143 1 0 2.8143 0 5.05234V5.24264C0 6.36786 0.44699 7.44699 1.24264 8.24264Z" 
+        fill={filled ? "#ff8800" : "none"}
+      />
+    </svg>
+  );
+
   const isOutOfStock = quantity <= 0;
 
   return (
@@ -54,10 +67,7 @@ function ProductCard({ id, image, title, price, quantity, handleAddToBasket, onC
         {isProcessing ? (
           <div className="favorite-spinner"></div>
         ) : (
-          <img
-            src={isFavorite ? heartFilled : heartOutline}
-            alt={isFavorite ? "Удалить из избранного" : "Добавить в избранное"}
-          />
+          <HeartIcon filled={isFavorite} />
         )}
       </button>
       <img src={image} alt={title} className="product-image" />

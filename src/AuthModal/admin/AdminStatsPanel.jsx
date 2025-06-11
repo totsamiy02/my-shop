@@ -290,7 +290,7 @@ function AdminStatsPanel() {
                                 </div>
                                 <div className="product-image-container">
                                     {product.image ? (
-                                        <img src={product.image} alt={product.name} className="product-image" />
+                                        <img src={product.image} alt={product.name} className="product-images" />
                                     ) : (
                                         <div className="no-image">Нет фото</div>
                                     )}

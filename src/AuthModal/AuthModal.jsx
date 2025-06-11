@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import './AuthModal.css';
-import flags from './data/flags'; // Импортируем данные о странах
+
+const countries = [
+  { name: 'Россия', flag: '🇷🇺', code: '+7', phoneCode: '7' },
+  { name: 'Беларусь', flag: '🇧🇾', code: '+375', phoneCode: '375' },
+  { name: 'Казахстан', flag: '🇰🇿', code: '+7', phoneCode: '7' },
+  { name: 'Украина', flag: '🇺🇦', code: '+380', phoneCode: '380' }
+];
 
 const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
     const [formData, setFormData] = useState({
@@ -26,10 +32,10 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
     const [resetStep, setResetStep] = useState(0);
     const [timer, setTimer] = useState(0);
     const [codeVerified, setCodeVerified] = useState(false);
-    const [selectedCountry, setSelectedCountry] = useState(flags[0]); // По умолчанию Россия
+    const [selectedCountry, setSelectedCountry] = useState(countries[0]);
     const [showCountrySelect, setShowCountrySelect] = useState(false);
+    const [touchedFields, setTouchedFields] = useState({});
 
-    // Таймер для кода подтверждения
     useEffect(() => {
         if (timer > 0) {
             const interval = setInterval(() => {
@@ -39,23 +45,44 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
         }
     }, [timer]);
 
+    const formatPhoneNumber = (phoneNumber) => {
+        if (!phoneNumber) return '';
+        
+        const digits = phoneNumber.replace(/\D/g, '');
+        const countryCode = selectedCountry.phoneCode;
+        
+        if (digits.startsWith(countryCode)) {
+            const localNumber = digits.substring(countryCode.length);
+            const match = localNumber.match(/^(\d{0,3})(\d{0,3})(\d{0,2})(\d{0,2})$/);
+            
+            let formatted = `${selectedCountry.code} `;
+            if (match[1]) formatted += `(${match[1]}`;
+            if (match[2]) formatted += `) ${match[2]}`;
+            if (match[3]) formatted += `-${match[3]}`;
+            if (match[4]) formatted += `-${match[4]}`;
+            
+            return formatted;
+        }
+        return `${selectedCountry.code} ${digits}`;
+    };
+
+    const handlePhoneChange = (e) => {
+        const input = e.target.value;
+        const digits = input.replace(/\D/g, '');
+        
+        const phoneWithCountryCode = selectedCountry.phoneCode + digits.substring(selectedCountry.phoneCode.length);
+        
+        setFormData({
+            ...formData,
+            phone: phoneWithCountryCode
+        });
+    };
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         
         if (name === 'phone') {
-            // Оставляем только цифры
-            const digits = value.replace(/\D/g, '');
-            // Форматируем номер телефона
-            let formattedValue = '';
-            
-            if (digits.length > 0) {
-                formattedValue = `${selectedCountry.code} ${digits.substring(0, 10)}`;
-            }
-            
-            setFormData({
-                ...formData,
-                [name]: formattedValue
-            });
+            handlePhoneChange(e);
             return;
         }
         
@@ -74,7 +101,6 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
     };
 
     const handleCodeChange = (index, value) => {
-        // Разрешаем только цифры
         if (/^\d?$/.test(value)) {
             const newCode = [...resetData.code];
             newCode[index] = value;
@@ -84,21 +110,14 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                 code: newCode
             });
             
-            // Автоматически переходим к следующему полю
             if (value && index < 5) {
                 document.getElementById(`code-input-${index + 1}`).focus();
             }
             
-            // Проверяем код при вводе всех 6 цифр
             if (newCode.every(c => c) && index === 5) {
                 verifyCode(newCode.join(''));
             }
         }
-    };
-
-    const validatePhone = (phone) => {
-        const digits = phone.replace(/\D/g, '');
-        return digits.length === 11;
     };
 
     const validate = () => {
@@ -123,7 +142,9 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
             if (mode === 'register') {
                 if (!formData.firstName.trim()) newErrors.firstName = 'Введите имя';
                 if (!formData.lastName.trim()) newErrors.lastName = 'Введите фамилию';
-                if (!validatePhone(formData.phone)) {
+                
+                const phoneDigits = formData.phone.replace(/\D/g, '');
+                if (phoneDigits.length < 11) {
                     newErrors.phone = 'Введите корректный номер телефона';
                 }
             }
@@ -175,6 +196,15 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
         }
     };
 
+    const selectCountry = (country) => {
+        setSelectedCountry(country);
+        const digits = formData.phone.replace(/\D/g, '').substring(selectedCountry.phoneCode.length);
+        setFormData({
+            ...formData,
+            phone: country.phoneCode + digits
+        });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         
@@ -205,10 +235,9 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                 : {
                     firstName: formData.firstName,
                     lastName: formData.lastName,
-                    phone: formData.phone.replace(/\D/g, ''),
+                    phone: formData.phone,
                     email: formData.email,
-                    password: formData.password,
-                    confirmPassword: formData.confirmPassword
+                    password: formData.password
                 };
             
             const response = await fetch(url, {
@@ -232,7 +261,10 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                 setMessage('Регистрация прошла успешно! Теперь вы можете войти.');
                 onModeChange('login');
                 setFormData({
-                    ...formData,
+                    firstName: '',
+                    lastName: '',
+                    phone: '',
+                    email: '',
                     password: '',
                     confirmPassword: ''
                 });
@@ -267,7 +299,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
             
             setMessage('6-значный код отправлен на ваш email. Проверьте почту.');
             setResetStep(2);
-            setTimer(300); // 5 минут таймер
+            setTimer(300);
             setCodeVerified(false);
             setResetData(prev => ({
                 ...prev,
@@ -317,7 +349,6 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                 onModeChange('login');
             }, 2000);
         } catch (error) {
-            console.error('Reset error:', error);
             setMessage(error.message || 'Ошибка при сбросе пароля');
         } finally {
             setIsLoading(false);
@@ -371,7 +402,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
             }
             
             setMessage('Новый код отправлен на ваш email');
-            setTimer(300); // 5 минут таймер
+            setTimer(300);
             setCodeVerified(false);
             setResetData(prev => ({
                 ...prev,
@@ -384,15 +415,8 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
         }
     };
 
-    const selectCountry = (country) => {
-        setSelectedCountry(country);
-        setShowCountrySelect(false);
-        // Обновляем номер телефона с новым кодом страны
-        const digits = formData.phone.replace(/\D/g, '').substring(1);
-        setFormData({
-            ...formData,
-            phone: country.code + (digits ? ` ${digits}` : '')
-        });
+    const handleBlur = (fieldName) => {
+        setTouchedFields({...touchedFields, [fieldName]: true});
     };
 
     if (!isOpen) return null;
@@ -427,6 +451,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                                             name="firstName"
                                             value={formData.firstName}
                                             onChange={handleChange}
+                                            onBlur={() => handleBlur('firstName')}
                                             placeholder="Введите ваше имя"
                                             className={errors.firstName ? 'error' : ''}
                                         />
@@ -440,6 +465,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                                             name="lastName"
                                             value={formData.lastName}
                                             onChange={handleChange}
+                                            onBlur={() => handleBlur('lastName')}
                                             placeholder="Введите вашу фамилию"
                                             className={errors.lastName ? 'error' : ''}
                                         />
@@ -459,7 +485,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                                             </div>
                                             {showCountrySelect && (
                                                 <div className="country-dropdown">
-                                                    {flags.map(country => (
+                                                    {countries.map(country => (
                                                         <div 
                                                             key={country.code}
                                                             className="country-option"
@@ -473,11 +499,12 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                                                 </div>
                                             )}
                                             <input
-                                                type="text"
+                                                type="tel"
                                                 name="phone"
-                                                value={formData.phone.substring(selectedCountry.code.length)}
-                                                onChange={handleChange}
-                                                placeholder="XXX XXX XX XX"
+                                                value={formatPhoneNumber(formData.phone)}
+                                                onChange={handlePhoneChange}
+                                                onBlur={() => handleBlur('phone')}
+                                                placeholder={`${selectedCountry.code} (XXX) XXX-XX-XX`}
                                                 className={`phone-input ${errors.phone ? 'error' : ''}`}
                                             />
                                         </div>
@@ -493,6 +520,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                                     name="email"
                                     value={formData.email}
                                     onChange={handleChange}
+                                    onBlur={() => handleBlur('email')}
                                     placeholder="Введите ваш email"
                                     className={errors.email ? 'error' : ''}
                                 />
@@ -507,6 +535,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                                         name="password"
                                         value={formData.password}
                                         onChange={handleChange}
+                                        onBlur={() => handleBlur('password')}
                                         placeholder="Введите пароль"
                                         className={errors.password ? 'error' : ''}
                                     />
@@ -529,6 +558,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                                         name="confirmPassword"
                                         value={formData.confirmPassword}
                                         onChange={handleChange}
+                                        onBlur={() => handleBlur('confirmPassword')}
                                         placeholder="Повторите пароль"
                                         className={errors.confirmPassword ? 'error' : ''}
                                     />
@@ -536,7 +566,11 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                                 </div>
                             )}
                             
-                            <button type="submit" className="submit-button" disabled={isLoading}>
+                            <button 
+                                type="submit" 
+                                className="submit-button" 
+                                disabled={isLoading}
+                            >
                                 {isLoading ? 'Загрузка...' : mode === 'login' ? 'Войти' : 'Зарегистрироваться'}
                             </button>
                             
@@ -559,7 +593,8 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                                     type="email"
                                     name="email"
                                     value={resetData.email}
-                                    onChange={(e) => setResetData({...resetData, email: e.target.value})}
+                                    onChange={handleResetChange}
+                                    onBlur={() => handleBlur('email')}
                                     placeholder="Введите email для восстановления"
                                     className={errors.email ? 'error' : ''}
                                 />
@@ -638,6 +673,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                                         name="newPassword"
                                         value={resetData.newPassword}
                                         onChange={handleResetChange}
+                                        onBlur={() => handleBlur('newPassword')}
                                         placeholder="Введите новый пароль"
                                         className={errors.newPassword ? 'error' : ''}
                                     />
@@ -659,6 +695,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                                     name="confirmPassword"
                                     value={resetData.confirmPassword}
                                     onChange={handleResetChange}
+                                    onBlur={() => handleBlur('confirmPassword')}
                                     placeholder="Повторите новый пароль"
                                     className={errors.confirmPassword ? 'error' : ''}
                                 />
