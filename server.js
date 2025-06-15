@@ -122,64 +122,180 @@ app.get('/api/check', (req, res) => {
 // Маршруты аутентификации
 app.post('/api/register', async (req, res) => {
     try {
+        // 1. Получаем и валидируем данные
         const { firstName, lastName, phone, email, password, confirmPassword } = req.body;
-        
-        if (password !== confirmPassword) {
-            return res.status(400).json({ error: 'Пароли не совпадают' });
+
+        // Проверка на обязательные поля
+        if (!firstName || !lastName || !phone || !email || !password || !confirmPassword) {
+            return res.status(400).json({ 
+                error: 'Все поля обязательны для заполнения',
+                missingFields: {
+                    firstName: !firstName,
+                    lastName: !lastName,
+                    phone: !phone,
+                    email: !email,
+                    password: !password,
+                    confirmPassword: !confirmPassword
+                }
+            });
         }
-        
+
+        // Валидация email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ error: 'Некорректный формат email' });
+        }
+
+        // Валидация пароля
         if (password.length < 8) {
             return res.status(400).json({ error: 'Пароль должен содержать минимум 8 символов' });
         }
-        
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const isAdmin = ADMIN_EMAILS.includes(email);
-        
-        db.run(
-            `INSERT INTO users (first_name, last_name, phone, email, password, role) VALUES (?, ?, ?, ?, ?, ?)`,
-            [firstName, lastName, phone, email, hashedPassword, isAdmin ? 'admin' : 'user'],
-            function(err) {
-                if (err) {
-                    if (err.message.includes('UNIQUE constraint failed: users.email')) {
-                        return res.status(400).json({ error: 'Пользователь с таким email уже существует' });
-                    }
-                    if (err.message.includes('UNIQUE constraint failed: users.phone')) {
-                        return res.status(400).json({ error: 'Пользователь с таким телефоном уже существует' });
-                    }
-                    return res.status(500).json({ error: 'Ошибка при регистрации' });
+
+        if (password !== confirmPassword) {
+            return res.status(400).json({ error: 'Пароли не совпадают' });
+        }
+
+        // Нормализация телефона (оставляем только цифры)
+        const normalizedPhone = phone.replace(/\D/g, '');
+
+        // Проверка длины телефона
+        if (normalizedPhone.length < 11) {
+            return res.status(400).json({ error: 'Номер телефона слишком короткий' });
+        }
+
+        // 2. Проверяем, существует ли пользователь
+        const userExists = await new Promise((resolve, reject) => {
+            db.get(
+                `SELECT id FROM users WHERE email = ? OR phone = ?`,
+                [email, normalizedPhone],
+                (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row);
                 }
-                
+            );
+        });
+
+        if (userExists) {
+            // Уточняем, что именно совпало
+            const emailExists = await new Promise((resolve) => {
                 db.get(
-                    `SELECT id, first_name, last_name, email, phone, role, avatar FROM users WHERE id = ?`,
-                    [this.lastID],
-                    (err, user) => {
-                        if (err || !user) {
-                            return res.status(500).json({ error: 'Ошибка при получении данных пользователя' });
-                        }
-                        
-                        const token = jwt.sign(
-                            { userId: user.id, role: user.role },
-                            process.env.JWT_SECRET || 'your-secret-key',
-                            { expiresIn: '24h' }
-                        );
-                        
-                        res.status(201).json({ 
-                            token,
-                            user: {
-                                id: user.id,
-                                firstName: user.first_name,
-                                lastName: user.last_name,
-                                role: user.role,
-                                avatar: user.avatar
-                            },
-                            message: 'Регистрация успешна' 
-                        });
-                    }
+                    `SELECT id FROM users WHERE email = ?`,
+                    [email],
+                    (err, row) => resolve(row)
                 );
+            });
+
+            const phoneExists = await new Promise((resolve) => {
+                db.get(
+                    `SELECT id FROM users WHERE phone = ?`,
+                    [normalizedPhone],
+                    (err, row) => resolve(row)
+                );
+            });
+
+            let errorMessage = 'Пользователь с такими данными уже существует';
+            if (emailExists && phoneExists) {
+                errorMessage = 'Пользователь с таким email и телефоном уже существует';
+            } else if (emailExists) {
+                errorMessage = 'Пользователь с таким email уже существует';
+            } else if (phoneExists) {
+                errorMessage = 'Пользователь с таким телефоном уже существует';
             }
+
+            return res.status(400).json({ error: errorMessage });
+        }
+
+        // 3. Хешируем пароль
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        // 4. Определяем роль пользователя
+        const ADMIN_EMAILS = process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',') : [];
+        const isAdmin = ADMIN_EMAILS.includes(email);
+        const role = isAdmin ? 'admin' : 'user';
+
+        // 5. Создаем пользователя
+        const newUser = await new Promise((resolve, reject) => {
+            db.run(
+                `INSERT INTO users (
+                    first_name, 
+                    last_name, 
+                    phone, 
+                    email, 
+                    password, 
+                    role,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
+                [firstName, lastName, normalizedPhone, email, hashedPassword, role],
+                function(err) {
+                    if (err) reject(err);
+                    else resolve(this.lastID);
+                }
+            );
+        });
+
+        // 6. Получаем данные созданного пользователя
+        const user = await new Promise((resolve, reject) => {
+            db.get(
+                `SELECT 
+                    id, 
+                    first_name as firstName, 
+                    last_name as lastName, 
+                    email, 
+                    phone, 
+                    role, 
+                    avatar 
+                FROM users 
+                WHERE id = ?`,
+                [newUser],
+                (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row);
+                }
+            );
+        });
+
+        if (!user) {
+            throw new Error('Не удалось получить данные пользователя после регистрации');
+        }
+
+        // 7. Генерируем JWT токен
+        const token = jwt.sign(
+            { userId: user.id, role: user.role },
+            process.env.JWT_SECRET || 'your-secret-key',
+            { expiresIn: '24h' }
         );
+
+        // 8. Отправляем успешный ответ
+        res.status(201).json({
+            success: true,
+            token,
+            user: {
+                id: user.id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                phone: user.phone,
+                role: user.role,
+                avatar: user.avatar
+            },
+            message: 'Регистрация успешно завершена'
+        });
+
     } catch (error) {
-        res.status(500).json({ error: 'Ошибка сервера' });
+        console.error('Ошибка регистрации:', error);
+        
+        // Специальная обработка для SQLite ошибок
+        if (error.message.includes('SQLITE_ERROR')) {
+            return res.status(500).json({ 
+                error: 'Ошибка базы данных',
+                details: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
+
+        res.status(500).json({ 
+            error: 'Внутренняя ошибка сервера',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 });
 
@@ -1228,6 +1344,39 @@ app.get('/api/admin/orders/:id', authenticateToken, (req, res) => {
                 });
             });
         });
+    });
+});
+
+app.put('/api/admin/orders/:id/status', authenticateToken, (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    
+    const orderId = req.params.id;
+    const { status } = req.body;
+    
+    // Проверяем допустимые статусы
+    const validStatuses = ['processing', 'shipped', 'delivered', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: 'Недопустимый статус заказа' });
+    }
+    
+    const query = `
+        UPDATE orders 
+        SET status = ?, 
+            updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ?
+    `;
+    
+    db.run(query, [status, orderId], function(err) {
+        if (err) {
+            console.error('Error updating order status:', err);
+            return res.status(500).json({ error: 'Ошибка при обновлении статуса заказа' });
+        }
+        
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'Заказ не найден' });
+        }
+        
+        res.json({ success: true, message: 'Статус заказа обновлен' });
     });
 });
 

@@ -69,38 +69,41 @@ function AdminStatsPanel() {
     };
 
     const updateOrderStatus = async (orderId, newStatus) => {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`/api/admin/orders/${orderId}/status`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ status: newStatus })
-            });
-            
-            if (!response.ok) throw new Error('Ошибка обновления статуса');
-            
-            setOrdersHistory(prev => prev.map(order => 
-                order.id === orderId ? { ...order, status: newStatus } : order
-            ));
-            
-            if (stats?.recentOrders) {
-                setStats(prev => ({
-                    ...prev,
-                    recentOrders: prev.recentOrders.map(order => 
-                        order.id === orderId ? { ...order, status: newStatus } : order
-                    )
-                }));
-            }
-            
-            toast.success('Статус заказа обновлен');
-            return true;
-        } catch (error) {
-            toast.error(error.message);
-            return false;
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/admin/orders/${orderId}/status`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: newStatus })
+        });
+        
+        if (!response.ok) throw new Error('Ошибка обновления статуса');
+        
+        setOrdersHistory(prev => prev.map(order => 
+            order.id === orderId ? { ...order, status: newStatus } : order
+        ));
+        
+        if (stats?.recentOrders) {
+            setStats(prev => ({
+                ...prev,
+                recentOrders: prev.recentOrders.map(order => 
+                    order.id === orderId ? { ...order, status: newStatus } : order
+                )
+            }));
         }
+        
+        // Обновляем selectedOrder, если он открыт
+        setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
+        
+        toast.success('Статус заказа обновлен');
+        return true;
+    } catch (error) {
+        toast.error(error.message);
+        return false;
+    }
     };
 
     const formatDate = (dateString) => {

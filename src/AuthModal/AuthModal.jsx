@@ -1,13 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './AuthModal.css';
 
-const countries = [
-  { name: 'Россия', flag: '🇷🇺', code: '+7', phoneCode: '7' },
-  { name: 'Беларусь', flag: '🇧🇾', code: '+375', phoneCode: '375' },
-  { name: 'Казахстан', flag: '🇰🇿', code: '+7', phoneCode: '7' },
-  { name: 'Украина', flag: '🇺🇦', code: '+380', phoneCode: '380' }
-];
-
 const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
     const [formData, setFormData] = useState({
         firstName: '',
@@ -32,8 +25,6 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
     const [resetStep, setResetStep] = useState(0);
     const [timer, setTimer] = useState(0);
     const [codeVerified, setCodeVerified] = useState(false);
-    const [selectedCountry, setSelectedCountry] = useState(countries[0]);
-    const [showCountrySelect, setShowCountrySelect] = useState(false);
     const [touchedFields, setTouchedFields] = useState({});
 
     useEffect(() => {
@@ -49,32 +40,39 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
         if (!phoneNumber) return '';
         
         const digits = phoneNumber.replace(/\D/g, '');
-        const countryCode = selectedCountry.phoneCode;
+        const trimmedDigits = digits.length > 11 ? digits.substring(0, 11) : digits;
         
-        if (digits.startsWith(countryCode)) {
-            const localNumber = digits.substring(countryCode.length);
-            const match = localNumber.match(/^(\d{0,3})(\d{0,3})(\d{0,2})(\d{0,2})$/);
-            
-            let formatted = `${selectedCountry.code} `;
-            if (match[1]) formatted += `(${match[1]}`;
-            if (match[2]) formatted += `) ${match[2]}`;
-            if (match[3]) formatted += `-${match[3]}`;
-            if (match[4]) formatted += `-${match[4]}`;
-            
-            return formatted;
-        }
-        return `${selectedCountry.code} ${digits}`;
+        const match = trimmedDigits.match(/^(\d{0,1})(\d{0,3})(\d{0,3})(\d{0,2})(\d{0,2})$/);
+        
+        if (!match) return `+7 ${trimmedDigits}`;
+        
+        let formatted = '+7';
+        if (match[2]) formatted += ` (${match[2]}`;
+        if (match[3]) formatted += `) ${match[3]}`;
+        if (match[4]) formatted += `-${match[4]}`;
+        if (match[5]) formatted += `-${match[5]}`;
+        
+        return formatted;
     };
 
     const handlePhoneChange = (e) => {
         const input = e.target.value;
         const digits = input.replace(/\D/g, '');
         
-        const phoneWithCountryCode = selectedCountry.phoneCode + digits.substring(selectedCountry.phoneCode.length);
+        let normalizedDigits = digits;
+        if (digits.startsWith('7') || digits.startsWith('8')) {
+            normalizedDigits = '7' + digits.substring(1);
+        } else if (digits.length > 0) {
+            normalizedDigits = '7' + digits;
+        }
+        
+        const limitedDigits = normalizedDigits.length > 11 ? 
+            normalizedDigits.substring(0, 11) : 
+            normalizedDigits;
         
         setFormData({
             ...formData,
-            phone: phoneWithCountryCode
+            phone: limitedDigits
         });
     };
 
@@ -144,8 +142,10 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                 if (!formData.lastName.trim()) newErrors.lastName = 'Введите фамилию';
                 
                 const phoneDigits = formData.phone.replace(/\D/g, '');
-                if (phoneDigits.length < 11) {
-                    newErrors.phone = 'Введите корректный номер телефона';
+                if (phoneDigits.length !== 11) {
+                    newErrors.phone = 'Введите корректный номер телефона (11 цифр)';
+                } else if (!phoneDigits.startsWith('7')) {
+                    newErrors.phone = 'Номер должен начинаться с +7';
                 }
             }
             
@@ -196,15 +196,6 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
         }
     };
 
-    const selectCountry = (country) => {
-        setSelectedCountry(country);
-        const digits = formData.phone.replace(/\D/g, '').substring(selectedCountry.phoneCode.length);
-        setFormData({
-            ...formData,
-            phone: country.phoneCode + digits
-        });
-    };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         
@@ -235,9 +226,10 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                 : {
                     firstName: formData.firstName,
                     lastName: formData.lastName,
-                    phone: formData.phone,
+                    phone: formData.phone.replace(/\D/g, ''),
                     email: formData.email,
-                    password: formData.password
+                    password: formData.password,
+                    confirmPassword: formData.confirmPassword
                 };
             
             const response = await fetch(url, {
@@ -472,43 +464,20 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange, onLoginSuccess }) => {
                                         {errors.lastName && <span className="error-text">{errors.lastName}</span>}
                                     </div>
                                     
-                                    <div className="form-group phone-group">
+                                    <div className="form-group">
                                         <label>Номер телефона</label>
-                                        <div className="phone-input-container">
-                                            <div 
-                                                className="country-selector"
-                                                onClick={() => setShowCountrySelect(!showCountrySelect)}
-                                            >
-                                                <span className="flag">{selectedCountry.flag}</span>
-                                                <span className="code">{selectedCountry.code}</span>
-                                                <span className="arrow">▼</span>
-                                            </div>
-                                            {showCountrySelect && (
-                                                <div className="country-dropdown">
-                                                    {countries.map(country => (
-                                                        <div 
-                                                            key={country.code}
-                                                            className="country-option"
-                                                            onClick={() => selectCountry(country)}
-                                                        >
-                                                            <span className="flag">{country.flag}</span>
-                                                            <span className="name">{country.name}</span>
-                                                            <span className="code">{country.code}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                            <input
-                                                type="tel"
-                                                name="phone"
-                                                value={formatPhoneNumber(formData.phone)}
-                                                onChange={handlePhoneChange}
-                                                onBlur={() => handleBlur('phone')}
-                                                placeholder={`${selectedCountry.code} (XXX) XXX-XX-XX`}
-                                                className={`phone-input ${errors.phone ? 'error' : ''}`}
-                                            />
-                                        </div>
+                                        <input
+                                            type="tel"
+                                            name="phone"
+                                            value={formatPhoneNumber(formData.phone)}
+                                            onChange={handlePhoneChange}
+                                            onBlur={() => handleBlur('phone')}
+                                            placeholder="+7 (XXX) XXX-XX-XX"
+                                            className={errors.phone ? 'error' : ''}
+                                            maxLength={18}
+                                        />
                                         {errors.phone && <span className="error-text">{errors.phone}</span>}
+                                        <div className="phone-hint">Только российские номера (+7)</div>
                                     </div>
                                 </>
                             )}

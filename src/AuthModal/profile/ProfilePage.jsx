@@ -6,9 +6,6 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ConfirmationModal from '../../Notification/ConfirmationModal.jsx';
 import './ProfilePage.css';
-import PhoneInput from 'react-phone-number-input';
-import 'react-phone-number-input/style.css';
-import { isValidPhoneNumber, parsePhoneNumber } from 'react-phone-number-input';
 
 function ProfilePage() {
     const [user, setUser] = useState(null);
@@ -37,32 +34,39 @@ function ProfilePage() {
     const [isPhoneDuplicate, setIsPhoneDuplicate] = useState(false);
     const navigate = useNavigate();
 
-    const allowedCountries = ['RU', 'BY', 'KZ', 'UA'];
+    const formatPhoneNumber = (phone) => {
+        if (!phone) return '';
+        
+        // Оставляем только цифры
+        const digits = phone.replace(/\D/g, '');
+        
+        // Удаляем лишние цифры (если введено больше 11)
+        const trimmedDigits = digits.length > 11 ? digits.substring(0, 11) : digits;
+        
+        // Форматируем номер по шаблону +7 (XXX) XXX-XX-XX
+        const match = trimmedDigits.match(/^(\d{0,1})(\d{0,3})(\d{0,3})(\d{0,2})(\d{0,2})$/);
+        
+        if (!match) return `+7 ${trimmedDigits}`;
+        
+        let formatted = '+7';
+        if (match[2]) formatted += ` (${match[2]}`;
+        if (match[3]) formatted += `) ${match[3]}`;
+        if (match[4]) formatted += `-${match[4]}`;
+        if (match[5]) formatted += `-${match[5]}`;
+        
+        return formatted;
+    };
 
     const formatDisplayPhone = (phone) => {
         if (!phone) return 'Не указан';
-        
-        try {
-            const phoneNumber = parsePhoneNumber(phone);
-            if (!phoneNumber) return phone;
-            
-            return phoneNumber.formatInternational();
-        } catch {
-            return phone;
-        }
+        return formatPhoneNumber(phone);
     };
 
     const validatePhone = (phone) => {
         if (!phone) return true;
         
-        try {
-            const phoneNumber = parsePhoneNumber(phone);
-            return phoneNumber && 
-                   allowedCountries.includes(phoneNumber.country) && 
-                   isValidPhoneNumber(phone);
-        } catch {
-            return false;
-        }
+        const digits = phone.replace(/\D/g, '');
+        return digits.startsWith('7') && digits.length === 11;
     };
 
     const checkPhoneDuplicate = async (phone) => {
@@ -98,7 +102,7 @@ function ProfilePage() {
         return (
             <div className="phone-display">
                 {formatDisplayPhone(phone)}
-                {!isValid && (
+                {!isValid && phone && (
                     <span className="phone-warning"> (некорректный формат)</span>
                 )}
             </div>
@@ -106,13 +110,25 @@ function ProfilePage() {
     };
 
     const checkAndSetPhoneError = (phone) => {
-        const isValid = validatePhone(phone);
-        if (!isValid) {
-            setPhoneError('Введите корректный номер телефона');
-        } else {
+        if (!phone) {
             setPhoneError('');
+            return true;
         }
-        return isValid;
+        
+        const digits = phone.replace(/\D/g, '');
+        
+        if (!digits.startsWith('7')) {
+            setPhoneError('Номер должен начинаться с +7');
+            return false;
+        }
+        
+        if (digits.length !== 11) {
+            setPhoneError('Номер должен содержать 11 цифр');
+            return false;
+        }
+        
+        setPhoneError('');
+        return true;
     };
 
     useEffect(() => {
@@ -165,29 +181,31 @@ function ProfilePage() {
         }));
     };
 
-    const handlePhoneChange = async (phone) => {
-        if (!phone) {
-            setPhoneError('');
-            setIsPhoneDuplicate(false);
-            setFormData(prev => ({ ...prev, phone: '' }));
-            return;
-        }
-
-        if (phone.startsWith('+8')) {
-            setPhoneError('Некорректный код страны');
-            return;
-        }
-
-        if (phone.length > 20) {
-            setPhoneError('Номер телефона слишком длинный');
-            return;
+    const handlePhoneChange = (e) => {
+        const input = e.target.value;
+        const digits = input.replace(/\D/g, '');
+        
+        let normalizedDigits = digits;
+        if (digits.startsWith('7') || digits.startsWith('8')) {
+            normalizedDigits = '7' + digits.substring(1);
+        } else if (digits.length > 0) {
+            normalizedDigits = '7' + digits;
         }
         
-        setFormData(prev => ({ ...prev, phone }));
-        checkAndSetPhoneError(phone);
+        const limitedDigits = normalizedDigits.length > 11 ? 
+            normalizedDigits.substring(0, 11) : 
+            normalizedDigits;
         
+        setFormData(prev => ({
+            ...prev,
+            phone: limitedDigits
+        }));
+        
+        checkAndSetPhoneError(limitedDigits);
+        
+        // Проверка на дубликат с задержкой
         const timer = setTimeout(async () => {
-            const isDuplicate = await checkPhoneDuplicate(phone);
+            const isDuplicate = await checkPhoneDuplicate(limitedDigits);
             if (isDuplicate) {
                 setPhoneError('Этот номер уже зарегистрирован');
             }
@@ -474,15 +492,14 @@ function ProfilePage() {
                                     </div>
                                     <div className="form-group">
                                         <label>Телефон</label>
-                                        <PhoneInput
-                                            international
-                                            defaultCountry="RU"
-                                            countries={allowedCountries}
-                                            value={formData.phone}
+                                        <input
+                                            type="tel"
+                                            name="phone"
+                                            value={formatPhoneNumber(formData.phone)}
                                             onChange={handlePhoneChange}
-                                            placeholder="Введите номер телефона"
+                                            placeholder="+7 (XXX) XXX-XX-XX"
                                             className={`phone-input ${phoneError ? 'invalid' : ''}`}
-                                            autoComplete="off"
+                                            maxLength={18}
                                         />
                                         {phoneError && (
                                             <div className="phone-error">{phoneError}</div>
@@ -492,6 +509,7 @@ function ProfilePage() {
                                                 Этот номер уже зарегистрирован
                                             </div>
                                         )}
+                                        <div className="phone-hint">Формат: +7 (XXX) XXX-XX-XX</div>
                                     </div>
 
                                     {!showPasswordForm && (

@@ -115,7 +115,7 @@ function Basket() {
                     quantity: item.quantity,
                     image: item.image
                 })),
-                totalAmount
+                totalAmount: parseFloat(totalAmount.toFixed(2)) // Округляем до 2 знаков
             };
 
             const response = await fetch('/api/orders/checkout', {
@@ -229,9 +229,9 @@ function Basket() {
         }
     };
 
-    const totalAmount = basket.reduce((sum, item) => {
+    const totalAmount = parseFloat(basket.reduce((sum, item) => {
         return sum + (item.price * item.quantity);
-    }, 0);
+    }, 0).toFixed(2)); // Округляем до 2 знаков после запятой
 
     const hasOutOfStockItems = basket.some(item => item.max_quantity <= 0);
 
@@ -321,7 +321,7 @@ function Basket() {
                                     </figure>
                                     <div className="cart-item-info">
                                         <h3 className="cart-item-name">{item.name}</h3>
-                                        <span className="cart-item-price">{item.price}₽</span>
+                                        <span className="cart-item-price">{item.price.toFixed(2)}₽</span> {/* Округляем цену товара */}
                                         <span className={`cart-item-stock ${item.max_quantity <= 0 ? 'out-of-stock' : ''}`}>
                                             {item.max_quantity <= 0 ? 'Нет в наличии' : `В наличии: ${item.max_quantity} шт.`} | {t('basket.in_cart')}: {item.quantity} {t('basket.pcs')}
                                         </span>
@@ -363,7 +363,7 @@ function Basket() {
                         <div className="cart-summary">
                             <div className="cart-total">
                                 <span className="total-label">{t('basket.total')}: </span>
-                                <span className="total-amount">{totalAmount}₽</span>
+                                <span className="total-amount">{totalAmount.toFixed(2)}₽</span> {/* Округляем общую сумму */}
                             </div>
                             <button 
                                 className="checkout-button"
